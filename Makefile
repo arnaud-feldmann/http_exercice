@@ -8,7 +8,6 @@ run: docker_image
 	docker create -p 55555:55555 --name http_exo http_exo
 	docker cp ./static/. http_exo:/static/
 	docker start http_exo
-	touch docker_image
 	
 stop:
 	docker container stop http_exo 2> /dev/null || true
