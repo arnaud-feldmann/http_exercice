@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <regex.h>
 #include <ctype.h>
+#include <sys/time.h>
 
 #define TRUE 1
 #define FALSE 0
@@ -34,6 +35,13 @@ void bind_port(int sockfd,uint16_t port) {
     }
 }
 
+void socket_timeout(int sockfd) {
+    struct timeval tv;
+    tv.tv_sec = 2;
+    tv.tv_usec = 0;
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+}
+
 int sockfd;
 
 void handler_sigterm(__attribute__((unused)) int sig) {
@@ -47,6 +55,7 @@ int main() {
     char rep[BUFFER_LEN];
     bool continuer_session = TRUE;
     sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    socket_timeout(sockfd);
     bind_port(sockfd, PORT);
     listen(sockfd, 15);
     struct sockaddr client_adr;
@@ -96,7 +105,6 @@ int main() {
                                 }
                                 rep[i]='\0';
                                 fclose(fichier);
-                                continuer_session = FALSE;
                             }
                         }
                         else {
@@ -106,8 +114,9 @@ int main() {
                         }
                     }
                     else strcpy(rep,"HTTP/1.1 501 Not Implemented\r\n");
+                    send(session_sockfd, rep, strlen(rep) + 1, 0);
                 }
-                send(session_sockfd, rep, strlen(rep) + 1, 0);
+                else continuer_session = FALSE;
             }
             close(session_sockfd);
             return 0;
