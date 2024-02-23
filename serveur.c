@@ -95,7 +95,7 @@ int main() {
                             fichier = fopen(nom_html, "r");
                             if (fichier == NULL) strcpy(rep,"HTTP/1.1 404 Not Found\r\n");
                             else {
-                                strcpy(rep,"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\n\r\n");
+                                strcpy(rep,"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\nConnection: close\r\n\r\n");
                                 int header_len = (int)strlen(rep);
                                 int i = header_len;
                                 for ( ; i < BUFFER_LEN - header_len ; i++) {
