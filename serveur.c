@@ -88,7 +88,13 @@ int main() {
                             else {
                                 strcpy(rep,"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\n\r\n");
                                 int header_len = (int)strlen(rep);
-                                fgets(rep+header_len,BUFFER_LEN-header_len-1,fichier);
+                                int i = header_len;
+                                for ( ; i < BUFFER_LEN - header_len ; i++) {
+                                    int temp_char = fgetc(fichier);
+                                    if (temp_char == EOF) break;
+                                    rep[i]=temp_char; 
+                                }
+                                rep[i]='\0';
                                 fclose(fichier);
                                 continuer_session = FALSE;
                             }
@@ -101,7 +107,7 @@ int main() {
                     }
                     else strcpy(rep,"HTTP/1.1 501 Not Implemented\r\n");
                 }
-                send(session_sockfd, rep, strlen(rep), 0);
+                send(session_sockfd, rep, strlen(rep) + 1, 0);
             }
             close(session_sockfd);
             return 0;
