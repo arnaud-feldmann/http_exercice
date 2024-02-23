@@ -10,10 +10,18 @@
 #include <regex.h>
 #include <ctype.h>
 #include <sys/time.h>
+#include <locale.h>
+#include <time.h>
 
 #define TRUE 1
 #define FALSE 0
 typedef int bool;
+
+void stamp_date(char* buffer) {
+    time_t now = time(0);
+    struct tm now_tm = *gmtime(&now);
+    strftime(buffer, 40, "Date: %a, %d %b %Y %H:%M:%S %Z\r\n\r\n", &now_tm);
+}
 
 void reuseaddr(int sockfd) {
     const int enable = 1;
@@ -69,6 +77,7 @@ int main() {
     signal(SIGINT,handler_sigterm);
     signal(SIGTERM,handler_sigterm);
     chdir("static");
+    setlocale(LC_ALL, "C"); // Pour que strftime soit en anglais
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
     while (TRUE) {
@@ -95,13 +104,16 @@ int main() {
                             fichier = fopen(nom_html, "r");
                             if (fichier == NULL) strcpy(rep,"HTTP/1.1 404 Not Found\r\n");
                             else {
-                                strcpy(rep,"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\nConnection: close\r\n\r\n");
+                                char* header_fixed = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\nConnection: close\r\n";
+                                const unsigned long header_fixed_len = strlen(header_fixed);
+                                strcpy(rep,header_fixed);
+                                stamp_date(rep+header_fixed_len);
                                 int header_len = (int)strlen(rep);
                                 int i = header_len;
                                 for ( ; i < BUFFER_LEN - header_len ; i++) {
                                     int temp_char = fgetc(fichier);
                                     if (temp_char == EOF) break;
-                                    rep[i]=temp_char; 
+                                    rep[i]=(char)temp_char;
                                 }
                                 rep[i]='\0';
                                 fclose(fichier);
