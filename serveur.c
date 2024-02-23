@@ -57,6 +57,7 @@ int main() {
         perror("regex");
         exit(EXIT_FAILURE);
     }
+    signal(SIGINT,handler_sigterm);
     signal(SIGTERM,handler_sigterm);
     chdir("static");
 #pragma clang diagnostic push
