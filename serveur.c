@@ -17,17 +17,40 @@
 #define FALSE 0
 typedef int bool;
 
-int tampon_date(char* buffer) {
-    time_t maintenant = time(0);
-    struct tm maintenant_tm = *gmtime(&maintenant);
-    return (int)strftime(buffer, 40, "Date: %a, %d %b %Y %H:%M:%S %Z\r\n", &maintenant_tm);
+/* Les tampons servent à construire le header. Ils prenent le pointeur vers le rep de réponse et une longueur,
+ * écrivent leur truc et incrémentent la longueur du header */
+
+void tampon_fixed(char* rep, int* rep_len) {
+    char* header_fixed = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\nConnection: close\r\n";
+    strcpy(rep,header_fixed);
+    *rep_len += (int) strlen(header_fixed);
 }
 
-int tampon_taille(char* buffer, FILE* fichier) {
+void tampon_date(char* rep, int* rep_len) {
+    time_t maintenant = time(0);
+    struct tm maintenant_tm = *gmtime(&maintenant);
+    *rep_len += (int)strftime(rep+(*rep_len), 40, "Date: %a, %d %b %Y %H:%M:%S %Z\r\n", &maintenant_tm);
+}
+
+void tampon_taille(char* rep, int* rep_len, FILE* fichier) {
     fseek(fichier, 0, SEEK_END);
     long taille = ftell(fichier);
     fseek(fichier, 0, SEEK_SET);
-    return sprintf(buffer,"Content-Length: %ld\r\n", taille);
+    *rep_len += sprintf(rep+(*rep_len), "Content-Length: %ld\r\n", taille);
+}
+
+void tampon_vide(char* rep, int* rep_len) {
+    strcpy(rep+(*rep_len),"\r\n");
+    *rep_len+=2;
+}
+
+int make_header(char* rep, FILE* fichier) {
+    int rep_len = 0;
+    tampon_fixed(rep,&rep_len);
+    tampon_date(rep,&rep_len);
+    tampon_taille(rep,&rep_len, fichier);
+    tampon_vide(rep,&rep_len);
+    return rep_len;
 }
 
 void erreur_si(bool condition, const char* message_perror) {
@@ -110,13 +133,7 @@ int main() {
                             fichier = fopen(nom_html, "r");
                             if (fichier == NULL) strcpy(rep,"HTTP/1.1 404 Not Found\r\nContent-Length: 13\r\n\r\n404 Not Found");
                             else {
-                                char* header_fixed = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\nConnection: close\r\n";
-                                int rep_len = (int) strlen(header_fixed);
-                                strcpy(rep,header_fixed);
-                                rep_len += tampon_date(rep + rep_len);
-                                rep_len += tampon_taille(rep + rep_len, fichier);
-                                strcpy(rep+rep_len,"\r\n");
-                                rep_len+=2;
+                                int rep_len = make_header(rep,fichier);
                                 for ( ; rep_len < BUFFER_LEN - 1 ; rep_len++) {
                                     int temp_char = fgetc(fichier);
                                     if (temp_char == EOF) break;
