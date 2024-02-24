@@ -18,7 +18,7 @@
 typedef int bool;
 
 static int sockfd_ecoute; /* Variable globale uniquement pour pouvoir la fermer en réponse à sigint/sigterm */
-static regex_t regex_requete_get; /* Variable globale pour ne la compiler qu'une fois */
+static regex_t regex_requete_http_get; /* Variable globale pour ne la compiler qu'une fois */
 
 void stop_si(bool condition, const char* message_perror) {
     if (condition) {
@@ -30,7 +30,7 @@ void stop_si(bool condition, const char* message_perror) {
 void handler_sigint_sigterm(__attribute__((unused)) int sig) {
     close(sockfd_ecoute);
     chdir("..");
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
 /* Fonctions de construction du header HTTP/1.1 200 OK */
@@ -72,7 +72,7 @@ int make_header(char* rep, FILE* fichier) {
 
 void construire_reponse(char* req, char* rep) {
     regmatch_t matches[4];
-    if (regexec(&regex_requete_get, req, 4, matches, 0) == 0) {
+    if (regexec(&regex_requete_http_get, req, 4, matches, 0) == 0) {
         char vermaj = req[matches[2].rm_so];
         char vermin = req[matches[3].rm_so];
         if (vermaj == '1' && vermin == '1') {
@@ -112,8 +112,9 @@ void construire_reponse(char* req, char* rep) {
 void repondre_sur(int sockfd_session) {
     char req[BUFFER_LEN];
     char rep[BUFFER_LEN];
+    req[0]='\0';
     long bytes;
-    while ((bytes = recv(sockfd_session, &req, BUFFER_LEN-1, 0)) > 0) {
+    while ((bytes = recv(sockfd_session, &req, BUFFER_LEN - 1, 0)) > 0) {
         req[bytes] = '\0';
         construire_reponse(req, rep);
         send(sockfd_session, rep, strlen(rep) + 1, 0);
@@ -152,8 +153,8 @@ int main() {
     listen(sockfd_ecoute, 15);
     struct sockaddr client_adr;
     socklen_t client_addrlen;
-    stop_si(regcomp(&regex_requete_get, "^GET\\s.*\\/([a-z]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
-            "regex_requete_get");
+    stop_si(regcomp(&regex_requete_http_get, "^GET\\s.*\\/([a-z]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
+            "regex_requete_http_get");
     signal(SIGINT, handler_sigint_sigterm);
     signal(SIGTERM, handler_sigint_sigterm);
     chdir("static");
@@ -164,7 +165,7 @@ int main() {
             close(sockfd_ecoute);
             repondre_sur(sockfd_session);
             close(sockfd_session);
-            return 0;
+            exit(EXIT_SUCCESS);
         } else close(sockfd_session);
     }
 }
