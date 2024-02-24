@@ -35,7 +35,7 @@ void handler_sigint_sigterm(__attribute__((unused)) int sig) {
 
 /* Fonctions de construction du header HTTP/1.1 200 OK */
 
-void tampon_fixed(char* rep, int* rep_len) {
+void tampon_fixe(char* rep, int* rep_len) {
     char* header_fixed = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\nConnection: close\r\n";
     strcpy(rep,header_fixed);
     *rep_len += (int) strlen(header_fixed);
@@ -61,7 +61,7 @@ void tampon_vide(char* rep, int* rep_len) {
 
 int make_header(char* rep, FILE* fichier) {
     int rep_len = 0;
-    tampon_fixed(rep,&rep_len);
+    tampon_fixe(rep, &rep_len);
     tampon_date(rep,&rep_len);
     tampon_taille(rep,&rep_len, fichier);
     tampon_vide(rep,&rep_len);
@@ -70,7 +70,7 @@ int make_header(char* rep, FILE* fichier) {
 
 /* Construction de la réponse du serveur. req est supposé existant */
 
-void make_rep(char* req, char* rep) {
+void construire_reponse(char* req, char* rep) {
     regmatch_t matches[4];
     if (regexec(&regex_requete_get, req, 4, matches, 0) == 0) {
         char vermaj = req[matches[2].rm_so];
@@ -107,6 +107,19 @@ void make_rep(char* req, char* rep) {
     else strcpy(rep,"HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n");
 }
 
+/* Gestion d'un socket de session ouvert */
+
+void repondre_sur(int sockfd_session) {
+    char req[BUFFER_LEN];
+    char rep[BUFFER_LEN];
+    long bytes;
+    while ((bytes = recv(sockfd_session, &req, BUFFER_LEN-1, 0)) > 0) {
+        req[bytes] = '\0';
+        construire_reponse(req, rep);
+        send(sockfd_session, rep, strlen(rep) + 1, 0);
+    }
+}
+
 /* Fonctions relatives à la mnipulation de socket */
 
 void reuseaddr(int sockfd) {
@@ -132,9 +145,6 @@ void socket_timeout(int sockfd) {
 }
 
 int main() {
-    char req[BUFFER_LEN];
-    char rep[BUFFER_LEN];
-    bool continuer_session = TRUE;
     sockfd_ecoute = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     stop_si(socket < 0, "socket");
     socket_timeout(sockfd_ecoute);
@@ -152,15 +162,7 @@ int main() {
         int sockfd_session = accept(sockfd_ecoute, &client_adr, &client_addrlen);
         if (fork() == 0) {
             close(sockfd_ecoute);
-            while (continuer_session) {
-                memset(req,0,BUFFER_LEN);
-                long bytes = recv(sockfd_session, &req, BUFFER_LEN, 0);
-                if (bytes > 0) {
-                    make_rep(req,rep);
-                    send(sockfd_session, rep, strlen(rep) + 1, 0);
-                }
-                else continuer_session = FALSE;
-            }
+            repondre_sur(sockfd_session);
             close(sockfd_session);
             return 0;
         } else close(sockfd_session);
