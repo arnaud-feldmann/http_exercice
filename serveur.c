@@ -52,7 +52,7 @@ void bind_port(int sockfd,uint16_t port) {
 
 void socket_timeout(int sockfd) {
     struct timeval tv;
-    tv.tv_sec = 2;
+    tv.tv_sec = 30;
     tv.tv_usec = 0;
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 }
