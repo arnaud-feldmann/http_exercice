@@ -14,7 +14,6 @@
 #include <time.h>
 
 #define TRUE 1
-#define FALSE 0
 typedef int bool;
 
 static int sockfd_ecoute; /* Variable globale uniquement pour pouvoir la fermer en réponse à sigint/sigterm */
@@ -132,10 +131,11 @@ void reuseaddr(int sockfd) {
 void bind_port(int sockfd,uint16_t port) {
     reuseaddr(sockfd);
     struct sockaddr_in adresse;
+    memset(&adresse, 0, sizeof(struct sockaddr_in));
     adresse.sin_family=AF_INET;
-    adresse.sin_port= htons(port);
+    adresse.sin_port=htons(port);
     adresse.sin_addr.s_addr=INADDR_ANY;
-    stop_si(bind(sockfd, (struct sockaddr *) &adresse, sizeof(adresse)), "bind");
+    stop_si(bind(sockfd, (struct sockaddr *) &adresse, sizeof(struct sockaddr_in)) < 0, "bind");
 }
 
 void socket_timeout(int sockfd) {
@@ -147,10 +147,10 @@ void socket_timeout(int sockfd) {
 
 int main() {
     sockfd_ecoute = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    stop_si(socket < 0, "socket");
+    stop_si(sockfd_ecoute < 0, "socket");
     socket_timeout(sockfd_ecoute);
     bind_port(sockfd_ecoute, PORT);
-    listen(sockfd_ecoute, 15);
+    stop_si(listen(sockfd_ecoute, 15) < 0,"listen");
     struct sockaddr client_adr;
     socklen_t client_addrlen;
     stop_si(regcomp(&regex_requete_http_get, "^GET\\s.*\\/([a-z]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
@@ -161,6 +161,7 @@ int main() {
     setlocale(LC_ALL, "C"); // Pour que strftime soit en anglais
     while (TRUE) {
         int sockfd_session = accept(sockfd_ecoute, &client_adr, &client_addrlen);
+        stop_si(sockfd_session < 0,"accept");
         if (fork() == 0) {
             close(sockfd_ecoute);
             repondre_sur(sockfd_session);
