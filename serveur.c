@@ -108,7 +108,7 @@ int main() {
                                 for(int i = 0; nom_html[i]; i++) nom_html[i] = (char)tolower(nom_html[i]);
                             }
                             fichier = fopen(nom_html, "r");
-                            if (fichier == NULL) strcpy(rep,"HTTP/1.1 404 Not Found\r\n");
+                            if (fichier == NULL) strcpy(rep,"HTTP/1.1 404 Not Found\r\nContent-Length: 13\r\n\r\n404 Not Found");
                             else {
                                 char* header_fixed = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\nConnection: close\r\n";
                                 int rep_len = (int) strlen(header_fixed);
@@ -127,12 +127,12 @@ int main() {
                             }
                         }
                         else {
-                            strcpy(rep,"HTTP/1.1 505 HTTP Version Not Supported\r\n");
+                            strcpy(rep,"HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\n\r\n");
                             rep[5]=vermaj;
                             rep[7]=vermin;
                         }
                     }
-                    else strcpy(rep,"HTTP/1.1 501 Not Implemented\r\n");
+                    else strcpy(rep,"HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n");
                     send(session_sockfd, rep, strlen(rep) + 1, 0);
                 }
                 else continuer_session = FALSE;
