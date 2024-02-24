@@ -30,12 +30,17 @@ int tampon_taille(char* buffer, FILE* fichier) {
     return sprintf(buffer,"Content-Length: %ld\r\n", taille);
 }
 
-void reuseaddr(int sockfd) {
-    const int enable = 1;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-        perror("setsockopt(SO_REUSEADDR)");
+void erreur_si(bool condition, const char* message_perror) {
+    if (condition) {
+        perror(message_perror);
         exit(EXIT_FAILURE);
     }
+}
+
+void reuseaddr(int sockfd) {
+    const int enable = 1;
+    erreur_si(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0,
+              "setsockopt(SO_REUSEADDR)");
 }
 
 void bind_port(int sockfd,uint16_t port) {
@@ -44,10 +49,7 @@ void bind_port(int sockfd,uint16_t port) {
     adresse.sin_family=AF_INET;
     adresse.sin_port= htons(port);
     adresse.sin_addr.s_addr=INADDR_ANY;
-    if (bind(sockfd, (struct sockaddr *) &adresse, sizeof(adresse))) {
-        perror("bind");
-        exit(EXIT_FAILURE);
-    }
+    erreur_si(bind(sockfd, (struct sockaddr *) &adresse, sizeof(adresse)), "bind");
 }
 
 void socket_timeout(int sockfd) {
@@ -70,6 +72,7 @@ int main() {
     char rep[BUFFER_LEN];
     bool continuer_session = TRUE;
     sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    erreur_si(socket < 0, "socket");
     socket_timeout(sockfd);
     bind_port(sockfd, PORT);
     listen(sockfd, 15);
@@ -77,16 +80,12 @@ int main() {
     socklen_t client_addrlen;
     regex_t regex;
     regmatch_t matches[4];
-    if (regcomp(&regex, "^GET\\s.*\\/([a-z]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED|REG_ICASE) != 0) {
-        perror("regex");
-        exit(EXIT_FAILURE);
-    }
+    erreur_si(regcomp(&regex, "^GET\\s.*\\/([a-z]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED|REG_ICASE),
+              "regex");
     signal(SIGINT,handler_sigterm);
     signal(SIGTERM,handler_sigterm);
     chdir("static");
     setlocale(LC_ALL, "C"); // Pour que strftime soit en anglais
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "EndlessLoop"
     while (TRUE) {
         int session_sockfd = accept(sockfd, &client_adr, &client_addrlen);
         if (fork() == 0) {
@@ -142,5 +141,4 @@ int main() {
             return 0;
         } else close(session_sockfd);
     }
-#pragma clang diagnostic pop
 }
