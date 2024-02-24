@@ -17,10 +17,17 @@
 #define FALSE 0
 typedef int bool;
 
-void stamp_date(char* buffer) {
-    time_t now = time(0);
-    struct tm now_tm = *gmtime(&now);
-    strftime(buffer, 40, "Date: %a, %d %b %Y %H:%M:%S %Z\r\n\r\n", &now_tm);
+int tampon_date(char* buffer) {
+    time_t maintenant = time(0);
+    struct tm maintenant_tm = *gmtime(&maintenant);
+    return (int)strftime(buffer, 40, "Date: %a, %d %b %Y %H:%M:%S %Z\r\n", &maintenant_tm);
+}
+
+int tampon_taille(char* buffer, FILE* fichier) {
+    fseek(fichier, 0, SEEK_END);
+    long taille = ftell(fichier);
+    fseek(fichier, 0, SEEK_SET);
+    return sprintf(buffer,"Content-Length: %ld\r\n", taille);
 }
 
 void reuseaddr(int sockfd) {
@@ -105,17 +112,18 @@ int main() {
                             if (fichier == NULL) strcpy(rep,"HTTP/1.1 404 Not Found\r\n");
                             else {
                                 char* header_fixed = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\nConnection: close\r\n";
-                                const unsigned long header_fixed_len = strlen(header_fixed);
+                                int rep_len = (int) strlen(header_fixed);
                                 strcpy(rep,header_fixed);
-                                stamp_date(rep+header_fixed_len);
-                                int header_len = (int)strlen(rep);
-                                int i = header_len;
-                                for ( ; i < BUFFER_LEN - header_len ; i++) {
+                                rep_len += tampon_date(rep + rep_len);
+                                rep_len += tampon_taille(rep + rep_len, fichier);
+                                strcpy(rep+rep_len,"\r\n");
+                                rep_len+=2;
+                                for ( ; rep_len < BUFFER_LEN - 1 ; rep_len++) {
                                     int temp_char = fgetc(fichier);
                                     if (temp_char == EOF) break;
-                                    rep[i]=(char)temp_char;
+                                    rep[rep_len]=(char)temp_char;
                                 }
-                                rep[i]='\0';
+                                rep[rep_len]='\0';
                                 fclose(fichier);
                             }
                         }
