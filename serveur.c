@@ -72,35 +72,36 @@ int make_header(char* rep, FILE* fichier) {
 
 void construire_reponse(char* req, char* rep) {
     regmatch_t matches[4];
-    if (regexec(&regex_requete_http_get, req, 4, matches, 0) == 0) {
-        char vermaj = req[matches[2].rm_so];
-        char vermin = req[matches[3].rm_so];
-        if (vermaj == '1' && vermin == '1') {
-            FILE *fichier;
-            int nom_html_match = matches[1].rm_so;
-            int nom_html_longueur = matches[1].rm_eo - nom_html_match;
-            char nom_html[BUFFER_LEN];
-            if (nom_html_longueur == 0) strcpy(nom_html,"index.html");
-            else {
-                strncpy(nom_html,req+nom_html_match,nom_html_longueur);
-                for(int i = 0; nom_html[i]; i++) nom_html[i] = (char)tolower(nom_html[i]);
-            }
-            fichier = fopen(nom_html, "r");
-            if (fichier == NULL) strcpy(rep,"HTTP/1.1 404 Not Found\r\nContent-Length: 13\r\n\r\n404 Not Found");
-            else {
-                int rep_len = make_header(rep,fichier);
-                for ( ; rep_len < BUFFER_LEN - 1 ; rep_len++) {
-                    int temp_char = fgetc(fichier);
-                    if (temp_char == EOF) break;
-                    rep[rep_len]=(char)temp_char;
-                }
-                rep[rep_len]='\0';
-                fclose(fichier);
-            }
-        }
-        else strcpy(rep,"HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\n\r\n");
+    if (regexec(&regex_requete_http_get, req, 4, matches, 0)) {
+        strcpy(rep, "HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n");
+        return;
     }
-    else strcpy(rep,"HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n");
+    if (req[matches[2].rm_so] != '1' || req[matches[3].rm_so] != '1') {
+        strcpy(rep, "HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\n\r\n");
+        return;
+    }
+    FILE *fichier;
+    int nom_html_match = matches[1].rm_so;
+    int nom_html_longueur = matches[1].rm_eo - nom_html_match;
+    char nom_html[BUFFER_LEN];
+    if (nom_html_longueur == 0) strcpy(nom_html,"index.html");
+    else {
+        strncpy(nom_html,req+nom_html_match,nom_html_longueur);
+        for(int i = 0; nom_html[i]; i++) nom_html[i] = (char)tolower(nom_html[i]);
+    }
+    fichier = fopen(nom_html, "r");
+    if (fichier == NULL) {
+        strcpy(rep, "HTTP/1.1 404 Not Found\r\nContent-Length: 13\r\n\r\n404 Not Found");
+        return;
+    }
+    int rep_len = make_header(rep,fichier);
+    for ( ; rep_len < BUFFER_LEN - 1 ; rep_len++) {
+        int temp_char = fgetc(fichier);
+        if (temp_char == EOF) break;
+        rep[rep_len]=(char)temp_char;
+    }
+    rep[rep_len]='\0';
+    fclose(fichier);
 }
 
 /* Gestion d'un socket de session ouvert */
@@ -108,23 +109,21 @@ void construire_reponse(char* req, char* rep) {
 void repondre_sur(int sockfd_session) {
     char req[BUFFER_LEN];
     char rep[BUFFER_LEN];
-    char reste_segment[BUFFER_LEN];
     req[0] = '\0';
-    char * segment = req;
     long longueur_segment;
     long longueur_totale = 0;
     regmatch_t matches[2];
-    while ((longueur_segment = recv(sockfd_session, segment, BUFFER_LEN - longueur_totale, 0)) > 0) {
+    while ((longueur_segment = recv(sockfd_session, req + longueur_totale, BUFFER_LEN - longueur_totale - 1, 0)) > 0) {
         longueur_totale += longueur_segment;
         req[longueur_totale] = '\0';
-        segment += longueur_segment;
         while (regexec(&regex_decoupage_requetes, req, 2, matches, 0) == 0) {
-            strcpy(reste_segment, req + matches[1].rm_eo); /* Tout ce qui vient après le /n/n */
+            char temp = req[matches[1].rm_eo];
+            req[matches[1].rm_eo] = '\0';
             construire_reponse(req, rep);
             send(sockfd_session, rep, strlen(rep) + 1, 0);
-            strcpy(req, reste_segment);
+            req[matches[1].rm_eo] = temp;
+            strcpy(req, req + matches[1].rm_eo); /* Tout ce qui vient après le /n/n */
             longueur_totale -= matches[1].rm_eo;
-            segment=req;
         }
     }
 }
