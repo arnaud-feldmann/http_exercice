@@ -104,29 +104,46 @@ void construire_reponse(char* req, char* rep) {
     fclose(fichier);
 }
 
+/* consommer_message */
+
+void consommer_message(int sockfd_session, char* req, char* rep, long longueur_requete, long* longueur_totale) {
+    char temp = req[longueur_requete];
+    req[longueur_requete] = '\0';
+    construire_reponse(req, rep);
+    send(sockfd_session, rep, strlen(rep) + 1, 0);
+    req[longueur_requete] = temp;
+    strcpy(req, req + longueur_requete); /* Tout ce qui vient après le /n/n */
+    *longueur_totale -= longueur_requete;
+}
+
 /* Gestion d'un socket de session ouvert */
 
+/* Note : On scanne d'abord que le segment qui vient d'être envoyé, car on veut éviter de tout rescanner ce qu'on nous
+ * a envoyé si quelqu'un s'amuse à envoyer des caractères un à un. Puis après on scanne le reste du message.
+ * Puisque \r?\n\r(\n) fait 4 caractères, on est obligés toutefois de scanner 3 caractères dans en arrière pour
+ * être sûr de ne rien manquer dans la première étape. */
+
 void repondre_sur(int sockfd_session) {
-    char req[BUFFER_LEN];
+    char req_moins_trois[BUFFER_LEN + 3] = "   ";
+    char* req = req_moins_trois + 3;
     char rep[BUFFER_LEN];
-    req[0] = '\0';
     long longueur_segment;
     long longueur_totale = 0;
     regmatch_t matches[2];
     while ((longueur_segment = recv(sockfd_session, req + longueur_totale, BUFFER_LEN - longueur_totale - 1, 0)) > 0) {
+        char * segment_moins_trois = req_moins_trois + longueur_totale;
         longueur_totale += longueur_segment;
         req[longueur_totale] = '\0';
+        if (regexec(&regex_decoupage_requetes, segment_moins_trois, 2, matches, 0) == 0) {
+            consommer_message(sockfd_session, req, rep, matches[1].rm_eo + segment_moins_trois - req, &longueur_totale);
+        }
         while (regexec(&regex_decoupage_requetes, req, 2, matches, 0) == 0) {
-            char temp = req[matches[1].rm_eo];
-            req[matches[1].rm_eo] = '\0';
-            construire_reponse(req, rep);
-            send(sockfd_session, rep, strlen(rep) + 1, 0);
-            req[matches[1].rm_eo] = temp;
-            strcpy(req, req + matches[1].rm_eo); /* Tout ce qui vient après le /n/n */
-            longueur_totale -= matches[1].rm_eo;
+            consommer_message(sockfd_session, req, rep, matches[1].rm_eo, &longueur_totale);
         }
     }
 }
+
+
 
 /* Fonctions relatives à la mnipulation de socket */
 
