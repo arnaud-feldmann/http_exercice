@@ -104,9 +104,10 @@ void construire_reponse(char* req, char* rep) {
     fclose(fichier);
 }
 
-/* consommer_message */
+/* Lit la requete qui est pointée par req, de longueur longueur_requete, puis copie le reste du buffer de requête
+ * à son début. */
 
-void consommer_message(int sockfd_session, char* req, char* rep, long longueur_requete, long* longueur_totale) {
+void consommer_requete(int sockfd_session, char* req, char* rep, long longueur_requete, long* longueur_totale) {
     char temp = req[longueur_requete];
     req[longueur_requete] = '\0';
     construire_reponse(req, rep);
@@ -135,10 +136,10 @@ void repondre_sur(int sockfd_session) {
         longueur_totale += longueur_segment;
         req[longueur_totale] = '\0';
         if (regexec(&regex_decoupage_requetes, segment_moins_trois, 2, matches, 0) == 0) {
-            consommer_message(sockfd_session, req, rep, matches[1].rm_eo + segment_moins_trois - req, &longueur_totale);
+            consommer_requete(sockfd_session, req, rep, matches[1].rm_eo + segment_moins_trois - req, &longueur_totale);
         }
         while (regexec(&regex_decoupage_requetes, req, 2, matches, 0) == 0) {
-            consommer_message(sockfd_session, req, rep, matches[1].rm_eo, &longueur_totale);
+            consommer_requete(sockfd_session, req, rep, matches[1].rm_eo, &longueur_totale);
         }
     }
 }
