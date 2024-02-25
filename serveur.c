@@ -17,7 +17,8 @@
 typedef int bool;
 
 static int sockfd_ecoute; /* Variable globale uniquement pour pouvoir la fermer en réponse à sigint/sigterm */
-static regex_t regex_requete_http_get; /* Variable globale pour ne la compiler qu'une fois */
+static regex_t regex_requete_http_get; /* Variable globale pour ne la compiler qu'une fois. */
+static regex_t regex_decoupage_requetes; /* Variable de découpage des requêtes */
 
 void stop_si(bool condition, const char* message_perror) {
     if (condition) {
@@ -111,12 +112,24 @@ void construire_reponse(char* req, char* rep) {
 void repondre_sur(int sockfd_session) {
     char req[BUFFER_LEN];
     char rep[BUFFER_LEN];
-    req[0]='\0';
-    long bytes;
-    while ((bytes = recv(sockfd_session, &req, BUFFER_LEN - 1, 0)) > 0) {
-        req[bytes] = '\0';
-        construire_reponse(req, rep);
-        send(sockfd_session, rep, strlen(rep) + 1, 0);
+    char reste_segment[BUFFER_LEN];
+    req[0] = '\0';
+    char * segment = req;
+    long longueur_segment;
+    long longueur_totale = 0;
+    regmatch_t matches[2];
+    while ((longueur_segment = recv(sockfd_session, segment, BUFFER_LEN - longueur_totale, 0)) > 0) {
+        longueur_totale += longueur_segment;
+        req[longueur_totale] = '\0';
+        segment += longueur_segment;
+        while (regexec(&regex_decoupage_requetes, req, 2, matches, 0) == 0) {
+            strcpy(reste_segment, req + matches[1].rm_eo); /* Tout ce qui vient après le /n/n */
+            construire_reponse(req, rep);
+            send(sockfd_session, rep, strlen(rep) + 1, 0);
+            strcpy(req, reste_segment);
+            longueur_totale -= matches[1].rm_eo;
+            segment=req;
+        }
     }
 }
 
@@ -153,6 +166,8 @@ int main() {
     stop_si(listen(sockfd_ecoute, 15) < 0,"listen");
     stop_si(regcomp(&regex_requete_http_get, "^GET\\s.*\\/([a-z]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
             "regex_requete_http_get");
+    stop_si(regcomp(&regex_decoupage_requetes, "\r?\n\r?(\n)", REG_EXTENDED),
+            "regex_decoupage_requetes");
     signal(SIGINT, handler_sigint_sigterm);
     signal(SIGTERM, handler_sigint_sigterm);
     chdir("static");
