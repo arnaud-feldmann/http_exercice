@@ -159,8 +159,8 @@ int main() {
     setlocale(LC_ALL, "C"); // Pour que strftime soit en anglais
     while (TRUE) {
         int sockfd_session = accept(sockfd_ecoute, NULL, NULL);
-        stop_si(sockfd_session < 0,"accept");
-        if (fork() == 0) {
+        if (sockfd_session < 0) sleep(1);
+        else if (fork() == 0) {
             close(sockfd_ecoute);
             repondre_sur(sockfd_session);
             close(sockfd_session);
