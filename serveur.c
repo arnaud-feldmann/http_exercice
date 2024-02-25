@@ -98,11 +98,7 @@ void construire_reponse(char* req, char* rep) {
                 fclose(fichier);
             }
         }
-        else {
-            strcpy(rep,"HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\n\r\n");
-            rep[5]=vermaj;
-            rep[7]=vermin;
-        }
+        else strcpy(rep,"HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\n\r\n");
     }
     else strcpy(rep,"HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n");
 }
