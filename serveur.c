@@ -151,8 +151,6 @@ int main() {
     socket_timeout(sockfd_ecoute);
     bind_port(sockfd_ecoute, PORT);
     stop_si(listen(sockfd_ecoute, 15) < 0,"listen");
-    struct sockaddr client_adr;
-    socklen_t client_addrlen;
     stop_si(regcomp(&regex_requete_http_get, "^GET\\s.*\\/([a-z]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
             "regex_requete_http_get");
     signal(SIGINT, handler_sigint_sigterm);
@@ -160,7 +158,7 @@ int main() {
     chdir("static");
     setlocale(LC_ALL, "C"); // Pour que strftime soit en anglais
     while (TRUE) {
-        int sockfd_session = accept(sockfd_ecoute, &client_adr, &client_addrlen);
+        int sockfd_session = accept(sockfd_ecoute, NULL, NULL);
         stop_si(sockfd_session < 0,"accept");
         if (fork() == 0) {
             close(sockfd_ecoute);
