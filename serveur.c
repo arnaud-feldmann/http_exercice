@@ -121,7 +121,7 @@ void consommer_requete(int sockfd_session, char* req, char* rep, long longueur_r
 
 /* Note : On scanne d'abord que le segment qui vient d'être envoyé, car on veut éviter de tout rescanner ce qu'on nous
  * a envoyé si quelqu'un s'amuse à envoyer des caractères un à un. Puis après on scanne le reste du message.
- * Puisque \r?\n\r(\n) fait 4 caractères, on est obligés toutefois de scanner 3 caractères dans en arrière pour
+ * Puisque \r?\n\r?(\n) fait 4 caractères, on est obligés toutefois de scanner 3 caractères dans en arrière pour
  * être sûr de ne rien manquer dans la première étape. */
 
 void repondre_sur(int sockfd_session) {
@@ -137,9 +137,9 @@ void repondre_sur(int sockfd_session) {
         req[longueur_totale] = '\0';
         if (regexec(&regex_decoupage_requetes, segment_moins_trois, 2, matches, 0) == 0) {
             consommer_requete(sockfd_session, req, rep, matches[1].rm_eo + segment_moins_trois - req, &longueur_totale);
-        }
-        while (regexec(&regex_decoupage_requetes, req, 2, matches, 0) == 0) {
-            consommer_requete(sockfd_session, req, rep, matches[1].rm_eo, &longueur_totale);
+            while (regexec(&regex_decoupage_requetes, req, 2, matches, 0) == 0) {
+                consommer_requete(sockfd_session, req, rep, matches[1].rm_eo, &longueur_totale);
+            }
         }
     }
 }
