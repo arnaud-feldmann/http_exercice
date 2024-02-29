@@ -25,5 +25,5 @@ jobs:
         password: ${{secrets.GITHUB_TOKEN}}
     - name: Build the Docker image
       run: |
-        docker buildx build --file Dockerfile --tag ghcr.io/arnaud-feldmann/http_exercice:${{ steps.date.outputs.date }} --tag ghcr.io/arnaud-feldmann/http_exercice:latest --platform linux/arm64,linux/amd64
+        docker buildx build --file Dockerfile --tag ghcr.io/arnaud-feldmann/http_exercice:${{ steps.date.outputs.date }} --tag ghcr.io/arnaud-feldmann/http_exercice:latest --platform linux/arm64,linux/amd64 .
         docker push ghcr.io/arnaud-feldmann/http_exercice --all-tags
