@@ -10,9 +10,7 @@ docker_image: Dockerfile
 	docker build . --file Dockerfile --tag http_exo
 
 run: docker_image serveur.c
-	docker create -p 55555:55555 --name http_exo http_exo
-	docker cp ./static/. http_exo:/static/
-	docker start http_exo
+	docker run -dp 55555:55555 --name http_exo http_exo
 	
 stop:
 	@$(call stop)
