@@ -183,6 +183,7 @@ int main() {
             "regex_decoupage_requetes");
     signal(SIGINT, handler_sigint_sigterm);
     signal(SIGTERM, handler_sigint_sigterm);
+    signal(SIGCHLD,SIG_IGN);
     chdir("static");
     setlocale(LC_ALL, "C"); // Pour que strftime soit en anglais
     while (TRUE) {
