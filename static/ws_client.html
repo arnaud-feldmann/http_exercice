@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8"/>
+        <title>Client WebSocket</title>
+    </head>
+    <body>
+        <ul id="res">
+        </ul>
+        <input type="input" id="key"></input>
+        <button disabled="true" onclick="envoyer()">Envoyer</button>
+        <br>
+        <button onclick="connexion()">Connect</button>
+        <button disabled="true" onclick="cloture()">Close</button>
+        <script>
+            function connexion(){
+                document.getElementById("btn_envoi").disabled = false;
+                document.getElementById("btn_cloture").disabled = false;
+                document.getElementById("btn_connexion").disabled = true;
+                ws = new WebSocket('ws://'+location.host+'/');
+                ws.onopen = function() {
+                    console.log('WebSocket Client Connected');
+                    ws.send('Hi this is web client.');
+                };
+                ws.onmessage = function(e) {
+                    console.log("Received: '" + e.data + "'");
+                    let li = document.createElement("li");
+                    li.innerText = e.data;
+                    document.getElementById("messages").appendChild(li);
+                };
+                ws.onerror = function(){
+                    console.log("Error => cloture");
+                    cloture();
+                }
+
+                function cloture(){
+                    document.getElementById("btn_envoi").disabled = true;
+                    document.getElementById("btn_cloture").disabled = true;
+                    document.getElementById("btn_connexion").disabled = false;
+                    ws.close();
+                    ws = undefined;
+                };
+
+                function envoyer(){
+                    if(ws){
+                        ws.send(document.getElementById("message").value);
+                    }
+                };
+        </script>
+</html>
+
