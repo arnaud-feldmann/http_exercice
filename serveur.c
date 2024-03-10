@@ -36,7 +36,7 @@ void construire_reponse(char* req, char* rep) {
         strcpy(rep, "HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\n\r\n");
         return;
     }
-    if (mode_session_courante != WEBSOCKET && est_header_websocket(req+matches[3].rm_so + 1)) mode_session_courante = WEBSOCKET;
+    if (mode_session_courante != WEBSOCKET && est_demande_websocket(req + matches[3].rm_so + 1)) mode_session_courante = WEBSOCKET;
     switch (mode_session_courante) {
         case FICHIER_HTML:
             construire_reponse_fichiers_html(req, rep, matches);
