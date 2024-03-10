@@ -177,7 +177,7 @@ int main() {
     socket_timeout(sockfd_ecoute);
     bind_port(sockfd_ecoute, PORT);
     stop_si(listen(sockfd_ecoute, 15) < 0,"listen");
-    stop_si(regcomp(&regex_requete_http_get, "^GET\\s.*\\/([a-z]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
+    stop_si(regcomp(&regex_requete_http_get, "^GET\\s.*\\/([a-z]+_\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
             "regex_requete_http_get");
     stop_si(regcomp(&regex_decoupage_requetes, "\r?\n\r?(\n)", REG_EXTENDED),
             "regex_decoupage_requetes");
