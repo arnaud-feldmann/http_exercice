@@ -6,7 +6,7 @@ endef
 all: docker_image
 
 serveur:  serveur.c common.c reponses_websocket.c reponses_http.c common.h reponses_websocket.h reponses_http.h
-	gcc ./serveur.c ./websocket.c ./fichiers_html.c ./common.c -o serveur -lcrypto -lb64
+	gcc ./serveur.c ./reponses_websocket.c ./reponses_http.c ./common.c -o serveur -lcrypto
 
 docker_image: Dockerfile serveur.c common.c reponses_websocket.c reponses_http.c common.h reponses_websocket.h reponses_http.h
 	@$(call stop)
@@ -20,7 +20,7 @@ stop:
 
 test: run
 	sleep 1
-	./test/test.sh
+	./test/test_http.sh
 	@$(call stop)
 
 clean: stop

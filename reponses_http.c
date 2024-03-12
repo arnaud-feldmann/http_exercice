@@ -10,37 +10,37 @@
 static regex_t regex_requete_http_get; /* Variable globale pour ne la compiler qu'une fois. */
 
 void initialisations_reponses_http() {
-    stop_si(regcomp(&regex_requete_http_get, "^GET\\s.*\\/([a-z_]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
+    stop_si(regcomp(&regex_requete_http_get, "^GET\\s.*\\/([a-z_]+\\.html|[a-z_]+)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
             "regex_requete_http_get");
 }
 
 /* Fonctions de construction du header HTTP/1.1 200 OK */
 
-void tampon_fixe(char* rep, int* rep_len) {
+static void tampon_fixe(char* rep, int* rep_len) {
     char* header_fixed = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nServer: ArnaudHTTP\r\nConnection: close\r\n";
     strcpy(rep,header_fixed);
     *rep_len += (int) strlen(header_fixed);
 }
 
-void tampon_date(char* rep, int* rep_len) {
+static void tampon_date(char* rep, int* rep_len) {
     time_t maintenant = time(0);
     struct tm maintenant_tm = *gmtime(&maintenant);
     *rep_len += (int)strftime(rep+(*rep_len), 40, "Date: %a, %d %b %Y %H:%M:%S %Z\r\n", &maintenant_tm);
 }
 
-void tampon_taille(char* rep, int* rep_len, FILE* fichier) {
+static void tampon_taille(char* rep, int* rep_len, FILE* fichier) {
     fseek(fichier, 0, SEEK_END);
     long taille = ftell(fichier);
     fseek(fichier, 0, SEEK_SET);
     *rep_len += sprintf(rep+(*rep_len), "Content-Length: %ld\r\n", taille);
 }
 
-void tampon_vide(char* rep, int* rep_len) {
+static void tampon_vide(char* rep, int* rep_len) {
     strcpy(rep+(*rep_len),"\r\n");
     *rep_len+=2;
 }
 
-int make_header(char* rep, FILE* fichier) {
+static int make_header(char* rep, FILE* fichier) {
     int rep_len = 0;
     tampon_fixe(rep, &rep_len);
     tampon_date(rep,&rep_len);
