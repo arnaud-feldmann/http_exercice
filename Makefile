@@ -6,7 +6,7 @@ endef
 all: docker_image
 
 serveur:  serveur.c common.c websocket.c fichiers_html.c common.h websocket.h fichiers_html.h
-	gcc ./serveur.c ./websocket.c ./fichiers_html.c ./common.c -o serveur
+	gcc ./serveur.c ./websocket.c ./fichiers_html.c ./common.c -o serveur -lcrypto -lb64
 
 docker_image: Dockerfile serveur.c common.c websocket.c fichiers_html.c common.h websocket.h fichiers_html.h
 	@$(call stop)

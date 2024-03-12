@@ -122,7 +122,7 @@ int main() {
             "regex_requete_http_get");
     stop_si(regcomp(&regex_decoupage_requetes, "\r?\n\r?(\n)", REG_EXTENDED),
             "regex_decoupage_requetes");
-    compiler_regex_websocket();
+    initialisations_websocket();
     signal(SIGINT, handler_sigint_sigterm);
     signal(SIGTERM, handler_sigint_sigterm);
     signal(SIGCHLD,SIG_IGN);
