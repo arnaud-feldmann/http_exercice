@@ -8,31 +8,25 @@
 #include <regex.h>
 #include <sys/time.h>
 #include <locale.h>
-#include "common.h"
-#include "reponses_websocket.h"
-#include "reponses_http.h"
+#include "http_common.h"
+#include "http_websocket_handshake.h"
+#include "http_reponses.h"
 
 static int sockfd_ecoute; /* Variable globale uniquement pour pouvoir la fermer en réponse à sigint/sigterm */
 static regex_t regex_decoupage_requetes; /* Variable de découpage des requêtes */
-enum mode_session mode_session_courante;
+bool vers_websocket = FALSE;
 
 void handler_sigint_sigterm(__attribute__((unused)) int sig) {
     close(sockfd_ecoute);
-    chdir("..");
     exit(EXIT_SUCCESS);
 }
 
-/* Construction de la réponse du serveur. req est supposé existant */
-
-void construire_reponse(char* req, char* rep) {
-    switch (mode_session_courante) {
-        case HTTP:
-            construire_reponse_http(req, rep, &mode_session_courante);
-            break;
-        case WEBSOCKET:
-            construire_reponse_websocket(req, rep);
-            break;
-    }
+void passer_a_websocket(int sockfd_session) {
+    char str_sockfd_session[20];
+    sprintf(str_sockfd_session, "%d", sockfd_session);
+    execl("./serveur_websocket", "serveur_websocket", str_sockfd_session, NULL);
+    perror("execl");
+    exit(EXIT_FAILURE);
 }
 
 /* Lit la requete qui est pointée par req, de longueur longueur_requete, puis copie le reste du buffer de requête
@@ -41,8 +35,9 @@ void construire_reponse(char* req, char* rep) {
 void consommer_requete(int sockfd_session, char* req, char* rep, long longueur_requete, long* longueur_totale) {
     char temp = req[longueur_requete];
     req[longueur_requete] = '\0';
-    construire_reponse(req, rep);
+    construire_reponse_http(req, rep);
     send(sockfd_session, rep, strlen(rep) + 1, 0);
+    if (vers_websocket) passer_a_websocket(sockfd_session);
     req[longueur_requete] = temp;
     strcpy(req, req + longueur_requete); /* Tout ce qui vient après le /n/n */
     *longueur_totale -= longueur_requete;
@@ -113,9 +108,7 @@ int main() {
     signal(SIGINT, handler_sigint_sigterm);
     signal(SIGTERM, handler_sigint_sigterm);
     signal(SIGCHLD,SIG_IGN);
-    chdir("static");
     setlocale(LC_ALL, "C"); // Pour que strftime soit en anglais
-    mode_session_courante = HTTP;
     while (TRUE) {
         int sockfd_session = accept(sockfd_ecoute, NULL, NULL);
         if (sockfd_session < 0) sleep(1);

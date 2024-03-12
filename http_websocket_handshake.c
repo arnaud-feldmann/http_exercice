@@ -3,11 +3,12 @@
 #include <openssl/sha.h>
 #include <openssl/pem.h>
 #include <string.h>
-#include "common.h"
-#include "reponses_websocket.h"
+#include "http_common.h"
+#include "http_websocket_handshake.h"
 
 const char* magic_websocket = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const char* header_accept = "HTTP/1.1 101 Switching Protocols\nUpgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Accept: ";
+extern bool vers_websocket;
 
 static regex_t regex_upgrade_websocket;
 static regex_t regex_connection_upgrade;
@@ -22,11 +23,11 @@ void initialisations_reponses_websocket() {
             "regex_websocket_key");
 }
 
-bool accept_websocket_si_demande(char* req, char* rep, int debut_header) {
+bool websocket_handshake_si_demande(char* req, char* rep, int fin_ligne_get) {
     regmatch_t match_key[4];
     char cle_ascii[61];
     unsigned char hash[21];
-    char* header = req + debut_header;
+    char* header = req + fin_ligne_get;
     bool res = (regexec(&regex_upgrade_websocket, header, 0, NULL, 0) == 0) &&
                (regexec(&regex_connection_upgrade, header, 0, NULL, 0) == 0) &&
                (regexec(&regex_websocket_key, header, 4, match_key, 0) == 0);
@@ -36,7 +37,8 @@ bool accept_websocket_si_demande(char* req, char* rep, int debut_header) {
     strcpy(rep,header_accept);
     SHA1((unsigned char *)cle_ascii, 60, hash);
     EVP_EncodeBlock((unsigned char*)rep + strlen(header_accept), hash, 20);
-    rep[strlen(header_accept) + 28] = '\0';
+    strcpy(rep+strlen(header_accept) + 28,"\n\n");
+    vers_websocket = TRUE;
     return TRUE;
 }
 

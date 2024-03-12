@@ -1,5 +1,5 @@
-#ifndef HTTP_COMMON_H
-#define HTTP_COMMON_H
+#ifndef HTTP_HTTP_COMMON_H
+#define HTTP_HTTP_COMMON_H
 
 #define TRUE 1
 #define FALSE 0
@@ -8,6 +8,5 @@
 
 typedef int bool;
 void stop_si(bool condition, const char* message_perror);
-enum mode_session { WEBSOCKET, HTTP };
 
-#endif //HTTP_COMMON_H
+#endif //HTTP_HTTP_COMMON_H

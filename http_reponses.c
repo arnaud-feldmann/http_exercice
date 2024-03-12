@@ -3,9 +3,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <regex.h>
-#include "common.h"
-#include "reponses_http.h"
-#include "reponses_websocket.h"
+#include "http_common.h"
+#include "http_reponses.h"
+#include "http_websocket_handshake.h"
 
 static regex_t regex_requete_http_get; /* Variable globale pour ne la compiler qu'une fois. */
 
@@ -49,7 +49,7 @@ static int make_header(char* rep, FILE* fichier) {
     return rep_len;
 }
 
-void construire_reponse_http(char* req, char* rep, enum mode_session* mode_session_courante) {
+void construire_reponse_http(char* req, char* rep) {
     regmatch_t matches[4];
     if (regexec(&regex_requete_http_get, req, 4, matches, 0)) {
         strcpy(rep, "HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n");
@@ -59,20 +59,18 @@ void construire_reponse_http(char* req, char* rep, enum mode_session* mode_sessi
         strcpy(rep, "HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\n\r\n");
         return;
     }
-    if (accept_websocket_si_demande(req, rep, matches[3].rm_so + 1)) {
-        *mode_session_courante = WEBSOCKET;
-        return;
-    }
+    if (websocket_handshake_si_demande(req, rep, matches[3].rm_so + 1)) return;
     FILE *fichier;
     int nom_html_match = matches[1].rm_so;
     int nom_html_longueur = matches[1].rm_eo - nom_html_match;
-    char nom_html[BUFFER_LEN];
+    char chemin_relatif_html[BUFFER_LEN+7] = "static/";
+    char* nom_html = chemin_relatif_html + 7;
     if (nom_html_longueur == 0) strcpy(nom_html,"index.html");
     else {
         strncpy(nom_html,req+nom_html_match,nom_html_longueur);
         for(int i = 0; nom_html[i]; i++) nom_html[i] = (char)tolower(nom_html[i]);
     }
-    fichier = fopen(nom_html, "r");
+    fichier = fopen(chemin_relatif_html, "r");
     if (fichier == NULL) {
         strcpy(rep, "HTTP/1.1 404 Not Found\r\nContent-Length: 13\r\n\r\n404 Not Found");
         return;
