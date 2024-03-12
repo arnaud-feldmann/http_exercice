@@ -8,5 +8,6 @@
 
 typedef int bool;
 void stop_si(bool condition, const char* message_perror);
+enum mode_session { WEBSOCKET, HTTP };
 
 #endif //HTTP_COMMON_H

@@ -4,7 +4,15 @@
 #include <ctype.h>
 #include <regex.h>
 #include "common.h"
-#include "fichiers_html.h"
+#include "reponses_http.h"
+#include "reponses_websocket.h"
+
+static regex_t regex_requete_http_get; /* Variable globale pour ne la compiler qu'une fois. */
+
+void initialisations_reponses_http() {
+    stop_si(regcomp(&regex_requete_http_get, "^GET\\s.*\\/([a-z_]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
+            "regex_requete_http_get");
+}
 
 /* Fonctions de construction du header HTTP/1.1 200 OK */
 
@@ -41,7 +49,20 @@ int make_header(char* rep, FILE* fichier) {
     return rep_len;
 }
 
-void construire_reponse_fichiers_html(char* req, char* rep, regmatch_t matches[4]) {
+void construire_reponse_http(char* req, char* rep, enum mode_session* mode_session_courante) {
+    regmatch_t matches[4];
+    if (regexec(&regex_requete_http_get, req, 4, matches, 0)) {
+        strcpy(rep, "HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n");
+        return;
+    }
+    if (req[matches[2].rm_so] != '1' || req[matches[3].rm_so] != '1') {
+        strcpy(rep, "HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\n\r\n");
+        return;
+    }
+    if (accept_websocket_si_demande(req, rep, matches[3].rm_so + 1)) {
+        *mode_session_courante = WEBSOCKET;
+        return;
+    }
     FILE *fichier;
     int nom_html_match = matches[1].rm_so;
     int nom_html_longueur = matches[1].rm_eo - nom_html_match;

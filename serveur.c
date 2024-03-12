@@ -9,13 +9,11 @@
 #include <sys/time.h>
 #include <locale.h>
 #include "common.h"
-#include "websocket.h"
-#include "fichiers_html.h"
+#include "reponses_websocket.h"
+#include "reponses_http.h"
 
 static int sockfd_ecoute; /* Variable globale uniquement pour pouvoir la fermer en réponse à sigint/sigterm */
-static regex_t regex_requete_http_get; /* Variable globale pour ne la compiler qu'une fois. */
 static regex_t regex_decoupage_requetes; /* Variable de découpage des requêtes */
-enum mode_session { WEBSOCKET, FICHIER_HTML };
 enum mode_session mode_session_courante;
 
 void handler_sigint_sigterm(__attribute__((unused)) int sig) {
@@ -27,22 +25,12 @@ void handler_sigint_sigterm(__attribute__((unused)) int sig) {
 /* Construction de la réponse du serveur. req est supposé existant */
 
 void construire_reponse(char* req, char* rep) {
-    regmatch_t matches[4];
-    if (regexec(&regex_requete_http_get, req, 4, matches, 0)) {
-        strcpy(rep, "HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n");
-        return;
-    }
-    if (req[matches[2].rm_so] != '1' || req[matches[3].rm_so] != '1') {
-        strcpy(rep, "HTTP/1.1 505 HTTP Version Not Supported\r\nContent-Length: 0\r\n\r\n");
-        return;
-    }
-    if (mode_session_courante != WEBSOCKET && est_demande_websocket(req + matches[3].rm_so + 1)) mode_session_courante = WEBSOCKET;
     switch (mode_session_courante) {
-        case FICHIER_HTML:
-            construire_reponse_fichiers_html(req, rep, matches);
+        case HTTP:
+            construire_reponse_http(req, rep, &mode_session_courante);
             break;
         case WEBSOCKET:
-            construire_reponse_websocket(req, rep, matches);
+            construire_reponse_websocket(req, rep);
             break;
     }
 }
@@ -118,17 +106,16 @@ int main() {
     socket_timeout(sockfd_ecoute);
     bind_port(sockfd_ecoute, PORT);
     stop_si(listen(sockfd_ecoute, 15) < 0,"listen");
-    stop_si(regcomp(&regex_requete_http_get, "^GET\\s.*\\/([a-z_]+\\.html)?\\sHTTP\\/([0-9])\\.([0-9])", REG_EXTENDED | REG_ICASE),
-            "regex_requete_http_get");
     stop_si(regcomp(&regex_decoupage_requetes, "\r?\n\r?(\n)", REG_EXTENDED),
             "regex_decoupage_requetes");
-    initialisations_websocket();
+    initialisations_reponses_http();
+    initialisations_reponses_websocket();
     signal(SIGINT, handler_sigint_sigterm);
     signal(SIGTERM, handler_sigint_sigterm);
     signal(SIGCHLD,SIG_IGN);
     chdir("static");
     setlocale(LC_ALL, "C"); // Pour que strftime soit en anglais
-    mode_session_courante = FICHIER_HTML;
+    mode_session_courante = HTTP;
     while (TRUE) {
         int sockfd_session = accept(sockfd_ecoute, NULL, NULL);
         if (sockfd_session < 0) sleep(1);

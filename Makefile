@@ -5,10 +5,10 @@ endef
 
 all: docker_image
 
-serveur:  serveur.c common.c websocket.c fichiers_html.c common.h websocket.h fichiers_html.h
+serveur:  serveur.c common.c reponses_websocket.c reponses_http.c common.h reponses_websocket.h reponses_http.h
 	gcc ./serveur.c ./websocket.c ./fichiers_html.c ./common.c -o serveur -lcrypto -lb64
 
-docker_image: Dockerfile serveur.c common.c websocket.c fichiers_html.c common.h websocket.h fichiers_html.h
+docker_image: Dockerfile serveur.c common.c reponses_websocket.c reponses_http.c common.h reponses_websocket.h reponses_http.h
 	@$(call stop)
 	docker build . --file Dockerfile --tag http_exo
 
