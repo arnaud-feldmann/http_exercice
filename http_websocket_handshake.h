@@ -1,7 +1,3 @@
-//
-// Created by arnaud on 10/03/24.
-//
-
 #ifndef HTTP_HTTP_WEBSOCKET_HANDSHAKE_H
 #define HTTP_HTTP_WEBSOCKET_HANDSHAKE_H
 

@@ -2,3 +2,4 @@
 new_test_*_snapshot
 docker_image
 serveur
+serveur_websocket
