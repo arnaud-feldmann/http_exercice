@@ -20,19 +20,16 @@ pipe_actifs_t pipe_actifs = {0,0,0,0,0,0,0,0,0,0};
 
 atomic_bool fin_session = ATOMIC_VAR_INIT(false);
 
-void printBits(size_t const size, void const * const ptr)
-{
-    unsigned char *b = (unsigned char*) ptr;
-    unsigned char byte;
-    int i, j;
-
-    for (i = size-1; i >= 0; i--) {
-        for (j = 7; j >= 0; j--) {
-            byte = (b[i] >> j) & 1;
-            printf("%u", byte);
+void afficher_bits(const void* adresse, size_t taille) {
+    const uint8_t* octets = (const uint8_t*)adresse;
+    for (size_t i = 0; i < taille; i++) {
+        for (int j = 7; j >= 0; j--) {
+            int bit = (octets[i] >> j) & 1;
+            printf("%d", bit);
         }
+        printf(" ");
     }
-    puts("");
+    printf("\n");
 }
 
 void recevoir_exactement(void* buf, long n) {
@@ -131,7 +128,7 @@ void envoyer_message(void* message, uint_fast64_t longueur,opcode_t opcode) {
         longueur_complete = longueur + sizeof(header_websocket_grand_t);
     }
     send(sockfd_session, rep, longueur_complete, 0);
-    printBits(longueur_complete,rep);
+    afficher_bits(rep,longueur_complete);
 }
 
 void texte_thread() {
@@ -180,7 +177,7 @@ void pong_thread() {
     struct pollfd pollfd_recv_pong[1] = {pipe_actifs.recv_pong[0], POLLIN, 0};
     message_thread_t message_thread;
 
-    for(sleep(15); ! fin_session; sleep(15)) {
+    for(sleep(2); ! fin_session; sleep(15)) {
         envoyer_message("",0,PING);
         if ((poll(pollfd_recv_pong, 1, 2000) <= 0) ||
             (read(pipe_actifs.recv_pong[0], &message_thread, sizeof(message_thread_t)) <= 0) ||
