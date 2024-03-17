@@ -3,7 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <regex.h>
-#include "http_common.h"
+#include "common.h"
 #include "http_reponses.h"
 #include "http_websocket_handshake.h"
 

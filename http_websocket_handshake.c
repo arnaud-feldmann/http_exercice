@@ -3,7 +3,7 @@
 #include <openssl/sha.h>
 #include <openssl/pem.h>
 #include <string.h>
-#include "http_common.h"
+#include "common.h"
 #include "http_websocket_handshake.h"
 
 const char* magic_websocket = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
@@ -31,7 +31,7 @@ bool websocket_handshake_si_demande(char* req, char* rep, int fin_ligne_get) {
     char* header = req + fin_ligne_get;
     bool res = (regexec(&regex_upgrade_websocket, header, 0, NULL, 0) == 0) &&
                (regexec(&regex_connection_upgrade, header, 0, NULL, 0) == 0);
-    if (! res) return FALSE;
+    if (! res) return false;
     strcpy(rep, header_handshake);
     if (regexec(&regex_websocket_key, header, 4, match_key, 0) == 0) {
         strcpy(rep + strlen(header_handshake), header_handshake_accept);
@@ -41,6 +41,6 @@ bool websocket_handshake_si_demande(char* req, char* rep, int fin_ligne_get) {
         EVP_EncodeBlock((unsigned char*)rep + strlen(header_handshake) + strlen(header_handshake_accept), hash, 20);
     }
     strcat(rep,"\n\n");
-    vers_websocket = TRUE;
-    return TRUE;
+    vers_websocket = true;
+    return true;
 }

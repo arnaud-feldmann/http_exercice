@@ -8,13 +8,13 @@
 #include <regex.h>
 #include <sys/time.h>
 #include <locale.h>
-#include "http_common.h"
+#include "common.h"
 #include "http_websocket_handshake.h"
 #include "http_reponses.h"
 
 static int sockfd_ecoute; /* Variable globale uniquement pour pouvoir la fermer en réponse à sigint/sigterm */
 static regex_t regex_decoupage_requetes; /* Variable de découpage des requêtes */
-bool vers_websocket = FALSE;
+bool vers_websocket = false;
 
 void handler_sigint_sigterm(__attribute__((unused)) int sig) {
     close(sockfd_ecoute);
@@ -109,7 +109,7 @@ int main() {
     signal(SIGTERM, handler_sigint_sigterm);
     signal(SIGCHLD,SIG_IGN);
     setlocale(LC_ALL, "C"); // Pour que strftime soit en anglais
-    while (TRUE) {
+    while (true) {
         int sockfd_session = accept(sockfd_ecoute, NULL, NULL);
         if (sockfd_session < 0) sleep(1);
         else if (fork() == 0) {
