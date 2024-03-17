@@ -6,7 +6,6 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <regex.h>
-#include <sys/time.h>
 #include <locale.h>
 #include "common.h"
 #include "http_websocket_handshake.h"
@@ -36,7 +35,7 @@ void consommer_requete(int sockfd_session, char* req, char* rep, long longueur_r
     char temp = req[longueur_requete];
     req[longueur_requete] = '\0';
     construire_reponse_http(req, rep);
-    send(sockfd_session, rep, strlen(rep) + 1, 0);
+    send(sockfd_session, rep, strlen(rep), 0);
     if (vers_websocket) passer_a_websocket(sockfd_session);
     req[longueur_requete] = temp;
     strcpy(req, req + longueur_requete); /* Tout ce qui vient après le /n/n */
@@ -86,13 +85,6 @@ void bind_port(int sockfd,uint16_t port) {
     adresse.sin_port=htons(port);
     adresse.sin_addr.s_addr=INADDR_ANY;
     stop_si(bind(sockfd, (struct sockaddr *) &adresse, sizeof(struct sockaddr_in)) < 0, "bind");
-}
-
-void socket_timeout(int sockfd) {
-    struct timeval tv;
-    tv.tv_sec = 30;
-    tv.tv_usec = 0;
-    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 }
 
 int main() {

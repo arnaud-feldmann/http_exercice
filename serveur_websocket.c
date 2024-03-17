@@ -5,7 +5,10 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <string.h>
+#include <endian.h>
+#include <stdio.h>
 #include "serveur_websocket.h"
+#include "common.h"
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "LoopDoesntUseConditionVariableInspection"
@@ -17,6 +20,33 @@ pipe_actifs_t pipe_actifs = {0,0,0,0,0,0,0,0,0,0};
 
 atomic_bool fin_session = ATOMIC_VAR_INIT(false);
 
+void printBits(size_t const size, void const * const ptr)
+{
+    unsigned char *b = (unsigned char*) ptr;
+    unsigned char byte;
+    int i, j;
+
+    for (i = size-1; i >= 0; i--) {
+        for (j = 7; j >= 0; j--) {
+            byte = (b[i] >> j) & 1;
+            printf("%u", byte);
+        }
+    }
+    puts("");
+}
+
+void recevoir_exactement(void* buf, long n) {
+    long total_octets_recus = 0;
+    long octets_recus;
+
+    while (total_octets_recus < n) {
+        octets_recus = recv(sockfd_session, buf + total_octets_recus, n - total_octets_recus, 0);
+        stop_si(octets_recus <= 0, "recv");
+        total_octets_recus += octets_recus;
+    }
+
+}
+
 void recv_thread() {
     header_websocket_grand_t header_websocket_grand;
     header_websocket_t* header_websocket = (header_websocket_t*)&header_websocket_grand;
@@ -24,23 +54,24 @@ void recv_thread() {
     uint8_t opcode_prec = -1;
     uint8_t opcode;
     struct pollfd pollfd_session[1] = {sockfd_session, POLLIN, 0};
+    socket_timeout(sockfd_session);
     while (! fin_session) {
         message_thread.fin = header_websocket->header_websocket_petit.fin;
         opcode = header_websocket->header_websocket_petit.opcode;
-        if ((poll(pollfd_session, 1, 2000) <= 0)) continue;
-        stop_si(recv(sockfd_session,header_websocket,2,0) < 2,"recv_header_1");
+        if (poll(pollfd_session, 1, 2000) <= 0) continue;
+        recevoir_exactement(header_websocket,2);
         if (header_websocket->header_websocket_petit.payload_length == 126) {
-            stop_si(recv(sockfd_session,header_websocket + 2,2,0) < 2, "recv_header_2");
-            message_thread.longueur = header_websocket->header_websocket_moyen.payload_length_2;
+            recevoir_exactement(header_websocket + 2,2);
+            message_thread.longueur = be16toh(header_websocket->header_websocket_moyen.payload_length_2);
         } else if (header_websocket->header_websocket_petit.payload_length == 127) {
-            stop_si(recv(sockfd_session,header_websocket + 2,8,0) < 8, "recv_header_3");
-            message_thread.longueur = header_websocket->header_websocket_grand.payload_length_2;
+            recevoir_exactement(header_websocket + 2, 8);
+            message_thread.longueur = be64toh(header_websocket->header_websocket_grand.payload_length_2);
         } else message_thread.longueur = header_websocket->header_websocket_petit.payload_length;
         if (message_thread.longueur > BUFFER_LEN) {
             fin_session = true;
             return;
         }
-        stop_si(recv(sockfd_session,&(message_thread.message),message_thread.longueur,0) < message_thread.longueur, "recv_message");
+        recevoir_exactement(&(message_thread.message),(long)message_thread.longueur);
         if (opcode == CONTINUATION) {
             if (opcode_prec != TEXTE && opcode_prec != BINAIRE) {
                 fin_session = true;
@@ -50,21 +81,21 @@ void recv_thread() {
         }
         switch (opcode) {
             case TEXTE:
-                stop_si(write(pipe_actifs.recv_texte[1], &(message_thread.message), sizeof(message_thread_t)), "write_texte");
+                stop_si(write(pipe_actifs.recv_texte[1], &message_thread, sizeof(message_thread_t)), "write_texte");
                 opcode_prec = TEXTE;
                 break;
             case BINAIRE:
-                stop_si(write(pipe_actifs.recv_binaire[1], &(message_thread.message), sizeof(message_thread_t)), "write_binaire");
+                stop_si(write(pipe_actifs.recv_binaire[1], &message_thread, sizeof(message_thread_t)), "write_binaire");
                 opcode_prec = BINAIRE;
                 break;
             case FERMETURE:
-                stop_si(write(pipe_actifs.recv_fermeture[1], &(message_thread.message), sizeof(message_thread_t)), "write_fermeture");
+                stop_si(write(pipe_actifs.recv_fermeture[1], &message_thread, sizeof(message_thread_t)), "write_fermeture");
                 break;
             case PING:
-                stop_si(write(pipe_actifs.recv_ping[1], &(message_thread.message), sizeof(message_thread_t)), "write_ping");
+                stop_si(write(pipe_actifs.recv_ping[1], &message_thread, sizeof(message_thread_t)), "write_ping");
                 break;
             case PONG:
-                stop_si(write(pipe_actifs.recv_pong[1], &(message_thread.message), sizeof(message_thread_t)), "write_ping");
+                stop_si(write(pipe_actifs.recv_pong[1], &message_thread, sizeof(message_thread_t)), "write_ping");
                 break;
             default:
                 fin_session = true;
@@ -89,17 +120,18 @@ void envoyer_message(void* message, uint_fast64_t longueur,opcode_t opcode) {
     } else if (longueur < 65536) {
         longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_moyen_t));
         rep_header->header_websocket_moyen.payload_length_1 = 126;
-        rep_header->header_websocket_moyen.payload_length_2 = longueur;
+        rep_header->header_websocket_moyen.payload_length_2 = htobe16(longueur);
         memcpy(rep + sizeof(header_websocket_moyen_t), message, longueur);
         longueur_complete = longueur + sizeof(header_websocket_moyen_t);
     } else {
         longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_grand_t));
         rep_header->header_websocket_grand.payload_length_1 = 127;
-        rep_header->header_websocket_grand.payload_length_2 = longueur;
+        rep_header->header_websocket_grand.payload_length_2 = htobe64(longueur);
         memcpy(rep + sizeof(header_websocket_grand_t), message, longueur);
         longueur_complete = longueur + sizeof(header_websocket_grand_t);
     }
-    send(sockfd_session, &rep, longueur_complete, 0);
+    send(sockfd_session, rep, longueur_complete, 0);
+    printBits(longueur_complete,rep);
 }
 
 void texte_thread() {
@@ -108,7 +140,8 @@ void texte_thread() {
     while (! fin_session) {
         if (poll(pollfd_recv_texte, 1, 2000)) continue;
         read(pipe_actifs.recv_texte[0], &message_thread, sizeof(message_thread_t));
-        envoyer_message(&(message_thread.message),1,TEXTE);
+        fwrite(message_thread.message, sizeof(char), message_thread.longueur, stdout);
+        envoyer_message(&(message_thread.message),min(1,message_thread.longueur),TEXTE);
     }
 }
 
@@ -147,7 +180,7 @@ void pong_thread() {
     struct pollfd pollfd_recv_pong[1] = {pipe_actifs.recv_pong[0], POLLIN, 0};
     message_thread_t message_thread;
 
-    for(; ! fin_session; sleep(15)) {
+    for(sleep(15); ! fin_session; sleep(15)) {
         envoyer_message("",0,PING);
         if ((poll(pollfd_recv_pong, 1, 2000) <= 0) ||
             (read(pipe_actifs.recv_pong[0], &message_thread, sizeof(message_thread_t)) <= 0) ||

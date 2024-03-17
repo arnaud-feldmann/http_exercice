@@ -8,16 +8,16 @@
         <ul id="res">
         </ul>
         <input type="input" id="key"></input>
-        <button disabled="true" onclick="envoyer()">Envoyer</button>
+        <button id="btn_envoi" disabled="true" onclick="envoyer()">Envoyer</button>
         <br>
-        <button onclick="connexion()">Connect</button>
-        <button disabled="true" onclick="cloture()">Close</button>
+        <button id="btn_connexion" onclick="connexion()">Connect</button>
+        <button id="btn_cloture" disabled="true" onclick="cloture()">Close</button>
         <script>
             function connexion(){
                 document.getElementById("btn_envoi").disabled = false;
                 document.getElementById("btn_cloture").disabled = false;
                 document.getElementById("btn_connexion").disabled = true;
-                ws = new WebSocket('ws://'+location.host+'/');
+                ws = new WebSocket('ws://'+location.host + '/');
                 ws.onopen = function() {
                     console.log('WebSocket Client Connected');
                     ws.send('Hi this is web client.');
@@ -32,20 +32,22 @@
                     console.log("Error => cloture");
                     cloture();
                 }
+            }
 
-                function cloture(){
-                    document.getElementById("btn_envoi").disabled = true;
-                    document.getElementById("btn_cloture").disabled = true;
-                    document.getElementById("btn_connexion").disabled = false;
-                    ws.close();
-                    ws = undefined;
-                };
+            function cloture(){
+                document.getElementById("btn_envoi").disabled = true;
+                document.getElementById("btn_cloture").disabled = true;
+                document.getElementById("btn_connexion").disabled = false;
+                ws.close();
+                ws = undefined;
+            }
 
-                function envoyer(){
-                    if(ws){
-                        ws.send(document.getElementById("message").value);
-                    }
-                };
+            function envoyer(){
+                if(ws){
+                    ws.send(document.getElementById("message").value);
+                }
+            }
         </script>
+    </body>
 </html>
 

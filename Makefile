@@ -6,8 +6,8 @@ endef
 all: docker_image
 
 serveur:  serveur.c common.c http_websocket_handshake.c http_reponses.c serveur_websocket.c common.h http_websocket_handshake.h http_reponses.h
-	gcc ./serveur.c ./http_websocket_handshake.c ./http_reponses.c ./http_common.c -o serveur -lcrypto
-	gcc ./serveur_websocket.c -o serveur_websocket
+	gcc ./serveur.c ./http_websocket_handshake.c ./http_reponses.c ./common.c -o serveur -lcrypto
+	gcc ./serveur_websocket.c ./common.c -o serveur_websocket
 
 docker_image: Dockerfile serveur.c common.c http_websocket_handshake.c http_reponses.c serveur_websocket.c common.h http_websocket_handshake.h http_reponses.h
 	@$(call stop)
