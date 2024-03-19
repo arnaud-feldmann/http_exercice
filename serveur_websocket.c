@@ -52,6 +52,8 @@ void recv_thread() {
     uint_fast8_t opcode;
     uint_fast8_t opcode_prec = -1;
     uint_fast8_t payload_length_1;
+    bool mask;
+    char masking_key[4];
     struct pollfd pollfd_session[1] = {sockfd_session, POLLIN, 0};
     socket_timeout(sockfd_session);
     while (! fin_session) {
@@ -59,6 +61,7 @@ void recv_thread() {
         recevoir_exactement(header_websocket,2);
         message_thread.fin = header_websocket->header_websocket_petit.fin_rsv_opcode >> 7;
         opcode = header_websocket->header_websocket_petit.fin_rsv_opcode & OPCODE;
+        mask = header_websocket->header_websocket_petit.mask_payload_length_1 >> 7;
         payload_length_1 = header_websocket->header_websocket_petit.mask_payload_length_1 & PAYLOAD_LENGTH_1;
         printf("OPCODE : %d\n", opcode);
         printf("payload_length_1 : %d\n", payload_length_1);
@@ -69,11 +72,15 @@ void recv_thread() {
             recevoir_exactement(header_websocket + 2, 8);
             message_thread.longueur = be64toh(header_websocket->header_websocket_grand.payload_length_2);
         } else message_thread.longueur = payload_length_1;
+        if (mask) recevoir_exactement(&masking_key, 4);
         if (message_thread.longueur > BUFFER_LEN) {
             fin_session = true;
             return;
         }
-        recevoir_exactement(&(message_thread.message),(long)message_thread.longueur);
+        recevoir_exactement(message_thread.message,(long)message_thread.longueur);
+        if (mask) {
+            for (int i = 0 ; i < message_thread.longueur ; i++) message_thread.message[i]=(message_thread.message[i])^masking_key[i%4];
+        }
         if (opcode == CONTINUATION) {
             if (opcode_prec != TEXTE && opcode_prec != BINAIRE) {
                 fin_session = true;
@@ -139,7 +146,7 @@ void texte_thread() {
         if (poll(pollfd_recv_texte, 1, 2000)) continue;
         read(pipe_actifs.recv_texte[0], &message_thread, sizeof(message_thread_t));
         fwrite(message_thread.message, sizeof(char), message_thread.longueur, stdout);
-        envoyer_message(&(message_thread.message),min(1,message_thread.longueur),TEXTE);
+        envoyer_message(message_thread.message,min(1,message_thread.longueur),TEXTE);
     }
 }
 
@@ -168,7 +175,7 @@ void ping_thread() {
     while (! fin_session) {
         if (poll(pollfd_recv_texte, 1, 2000)) continue;
         read(pipe_actifs.recv_texte[0], &message_thread, sizeof(message_thread_t));
-        envoyer_message(&(message_thread.message),message_thread.longueur,PONG);
+        envoyer_message(message_thread.message,message_thread.longueur,PONG);
     }
 }
 

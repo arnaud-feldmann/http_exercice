@@ -67,7 +67,7 @@ typedef union {
 struct message_thread {
     bool fin;
     uint64_t longueur;
-    char message[BUFFER_LEN];
+    uint8_t message[BUFFER_LEN];
 };
 typedef struct message_thread message_thread_t;
 
