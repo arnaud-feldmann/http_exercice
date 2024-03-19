@@ -174,6 +174,10 @@ void ping_thread() {
     while (! fin_session) {
         if (poll(pollfd_recv_texte, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_texte[0], &message_thread, sizeof(message_thread_t));
+        if (message_thread.longueur > 125) {
+            fin_session = true;
+            return;
+        }
         envoyer_message(message_thread.message,message_thread.longueur,PONG);
     }
 }
