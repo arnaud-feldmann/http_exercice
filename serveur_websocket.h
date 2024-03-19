@@ -34,32 +34,27 @@ typedef struct pipe_actifs pipe_actifs_t;
 
 typedef uint8_t opcode_t;
 
+#define FIN 0b10000000
+#define OPCODE 0b00001111
+#define PAYLOAD_LENGTH_1 0b01111111
+
 struct header_websocket_petit {
-    bool fin : 1;
-    uint8_t rsv : 3;
-    opcode_t opcode: 4;
-    bool mask: 1;
-    uint8_t payload_length: 7;
+    uint8_t fin_rsv_opcode;
+    uint8_t mask_payload_length_1;
 };
 typedef struct header_websocket_petit header_websocket_petit_t;
 
 struct header_websocket_moyen {
-    bool fin : 1;
-    uint8_t rsv : 3;
-    uint8_t opcode: 4;
-    bool mask: 1;
-    uint8_t payload_length_1: 7;
-    uint16_t payload_length_2: 16;
+    uint8_t fin_rsv_opcode;
+    uint8_t mask_payload_length_1;
+    uint16_t payload_length_2;
 };
 typedef struct header_websocket_moyen header_websocket_moyen_t;
 
 struct header_websocket_grand {
-    bool fin : 1;
-    uint8_t rsv : 3;
-    uint8_t opcode: 4;
-    bool mask: 1;
-    uint8_t payload_length_1: 7;
-    uint64_t payload_length_2: 64;
+    uint8_t fin_rsv_opcode;
+    uint8_t mask_payload_length_1;
+    uint64_t payload_length_2;
 };
 typedef struct header_websocket_grand header_websocket_grand_t;
 

@@ -38,6 +38,7 @@ void recevoir_exactement(void* buf, long n) {
 
     while (total_octets_recus < n) {
         octets_recus = recv(sockfd_session, buf + total_octets_recus, n - total_octets_recus, 0);
+        afficher_bits(buf + total_octets_recus,octets_recus);
         stop_si(octets_recus <= 0, "recv");
         total_octets_recus += octets_recus;
     }
@@ -48,22 +49,26 @@ void recv_thread() {
     header_websocket_grand_t header_websocket_grand;
     header_websocket_t* header_websocket = (header_websocket_t*)&header_websocket_grand;
     message_thread_t message_thread;
-    uint8_t opcode_prec = -1;
-    uint8_t opcode;
+    uint_fast8_t opcode;
+    uint_fast8_t opcode_prec = -1;
+    uint_fast8_t payload_length_1;
     struct pollfd pollfd_session[1] = {sockfd_session, POLLIN, 0};
     socket_timeout(sockfd_session);
     while (! fin_session) {
-        message_thread.fin = header_websocket->header_websocket_petit.fin;
-        opcode = header_websocket->header_websocket_petit.opcode;
         if (poll(pollfd_session, 1, 2000) <= 0) continue;
         recevoir_exactement(header_websocket,2);
-        if (header_websocket->header_websocket_petit.payload_length == 126) {
+        message_thread.fin = header_websocket->header_websocket_petit.fin_rsv_opcode >> 7;
+        opcode = header_websocket->header_websocket_petit.fin_rsv_opcode & OPCODE;
+        payload_length_1 = header_websocket->header_websocket_petit.mask_payload_length_1 & PAYLOAD_LENGTH_1;
+        printf("OPCODE : %d\n", opcode);
+        printf("payload_length_1 : %d\n", payload_length_1);
+        if (payload_length_1 == 126) {
             recevoir_exactement(header_websocket + 2,2);
             message_thread.longueur = be16toh(header_websocket->header_websocket_moyen.payload_length_2);
-        } else if (header_websocket->header_websocket_petit.payload_length == 127) {
+        } else if (payload_length_1 == 127) {
             recevoir_exactement(header_websocket + 2, 8);
             message_thread.longueur = be64toh(header_websocket->header_websocket_grand.payload_length_2);
-        } else message_thread.longueur = header_websocket->header_websocket_petit.payload_length;
+        } else message_thread.longueur = payload_length_1;
         if (message_thread.longueur > BUFFER_LEN) {
             fin_session = true;
             return;
@@ -78,21 +83,21 @@ void recv_thread() {
         }
         switch (opcode) {
             case TEXTE:
-                stop_si(write(pipe_actifs.recv_texte[1], &message_thread, sizeof(message_thread_t)), "write_texte");
+                stop_si(write(pipe_actifs.recv_texte[1], &message_thread, sizeof(message_thread_t)) == 0, "write_texte");
                 opcode_prec = TEXTE;
                 break;
             case BINAIRE:
-                stop_si(write(pipe_actifs.recv_binaire[1], &message_thread, sizeof(message_thread_t)), "write_binaire");
+                stop_si(write(pipe_actifs.recv_binaire[1], &message_thread, sizeof(message_thread_t)) == 0, "write_binaire");
                 opcode_prec = BINAIRE;
                 break;
             case FERMETURE:
-                stop_si(write(pipe_actifs.recv_fermeture[1], &message_thread, sizeof(message_thread_t)), "write_fermeture");
+                stop_si(write(pipe_actifs.recv_fermeture[1], &message_thread, sizeof(message_thread_t)) == 0, "write_fermeture");
                 break;
             case PING:
-                stop_si(write(pipe_actifs.recv_ping[1], &message_thread, sizeof(message_thread_t)), "write_ping");
+                stop_si(write(pipe_actifs.recv_ping[1], &message_thread, sizeof(message_thread_t)) == 0, "write_ping");
                 break;
             case PONG:
-                stop_si(write(pipe_actifs.recv_pong[1], &message_thread, sizeof(message_thread_t)), "write_ping");
+                stop_si(write(pipe_actifs.recv_pong[1], &message_thread, sizeof(message_thread_t)) == 0, "write_ping");
                 break;
             default:
                 fin_session = true;
@@ -105,30 +110,26 @@ void envoyer_message(void* message, uint_fast64_t longueur,opcode_t opcode) {
     uint_fast64_t longueur_complete;
     char rep[BUFFER_LEN];
     header_websocket_t* rep_header = (header_websocket_t*)rep;
-    rep_header->header_websocket_petit.fin = true;
-    rep_header->header_websocket_petit.rsv = 0;
-    rep_header->header_websocket_petit.opcode = opcode;
-    rep_header->header_websocket_petit.mask = false;
+    rep_header->header_websocket_petit.fin_rsv_opcode = FIN|opcode;
     if (longueur < 126) {
         longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_petit_t));
-        rep_header->header_websocket_petit.payload_length = longueur;
+        rep_header->header_websocket_petit.mask_payload_length_1 = longueur;
         memcpy(rep + sizeof(header_websocket_petit_t), message, longueur);
         longueur_complete = longueur + sizeof(header_websocket_petit_t);
     } else if (longueur < 65536) {
         longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_moyen_t));
-        rep_header->header_websocket_moyen.payload_length_1 = 126;
+        rep_header->header_websocket_moyen.mask_payload_length_1 = 126;
         rep_header->header_websocket_moyen.payload_length_2 = htobe16(longueur);
         memcpy(rep + sizeof(header_websocket_moyen_t), message, longueur);
         longueur_complete = longueur + sizeof(header_websocket_moyen_t);
     } else {
         longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_grand_t));
-        rep_header->header_websocket_grand.payload_length_1 = 127;
+        rep_header->header_websocket_grand.mask_payload_length_1 = 127;
         rep_header->header_websocket_grand.payload_length_2 = htobe64(longueur);
         memcpy(rep + sizeof(header_websocket_grand_t), message, longueur);
         longueur_complete = longueur + sizeof(header_websocket_grand_t);
     }
     send(sockfd_session, rep, longueur_complete, 0);
-    afficher_bits(rep,longueur_complete);
 }
 
 void texte_thread() {
@@ -218,7 +219,11 @@ int main(__attribute__((unused)) int argc, char * argv[]) {
     pthread_join(pthreads_actifs.recv_fermeture, NULL);
     pthread_join(pthreads_actifs.recv_ping, NULL);
     pthread_join(pthreads_actifs.recv_pong, NULL);
-    close(pipe_actifs.recv_pong[1]);
+    close(pipe_actifs.recv_texte[0]);
+    close(pipe_actifs.recv_binaire[0]);
+    close(pipe_actifs.recv_fermeture[0]);
+    close(pipe_actifs.recv_ping[0]);
+    close(pipe_actifs.recv_pong[0]);
     close(pipe_actifs.recv_texte[1]);
     close(pipe_actifs.recv_binaire[1]);
     close(pipe_actifs.recv_fermeture[1]);
