@@ -145,7 +145,7 @@ void texte_thread() {
         if (poll(pollfd_recv_texte, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_texte[0], &message_thread, sizeof(message_thread_t));
         fwrite(message_thread.message, sizeof(char), message_thread.longueur, stdout);
-        envoyer_message(message_thread.message,min(1,message_thread.longueur),TEXTE);
+        envoyer_message(message_thread.message,message_thread.longueur,TEXTE);
     }
 }
 
