@@ -9,6 +9,15 @@
 #include "serveur_websocket.h"
 #include "common.h"
 
+#define retourne_et_fin_session_si(condition, message)\
+    if (condition) {                   \
+            printf(message);           \
+            printf("\n");              \
+            fin_session = true;        \
+            return;                    \
+            }                          \
+    else ((void)0)
+
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "LoopDoesntUseConditionVariableInspection"
 
@@ -39,7 +48,7 @@ void recevoir_exactement(void* buf, long n) {
     while (total_octets_recus < n) {
         octets_recus = recv(sockfd_session, buf + total_octets_recus, n - total_octets_recus, 0);
         afficher_bits(buf + total_octets_recus,octets_recus);
-        stop_si(octets_recus <= 0, "recv");
+        retourne_et_fin_session_si(octets_recus <= 0, "recv");
         total_octets_recus += octets_recus;
     }
 
@@ -89,25 +98,24 @@ void recv_thread() {
         }
         switch (opcode) {
             case TEXTE:
-                stop_si(write(pipe_actifs.recv_texte[1], &message_thread, sizeof(message_thread_t)) == 0, "write_texte");
+                retourne_et_fin_session_si(write(pipe_actifs.recv_texte[1], &message_thread, sizeof(message_thread_t)) == 0, "write_texte");
                 opcode_prec = TEXTE;
                 break;
             case BINAIRE:
-                stop_si(write(pipe_actifs.recv_binaire[1], &message_thread, sizeof(message_thread_t)) == 0, "write_binaire");
+                retourne_et_fin_session_si(write(pipe_actifs.recv_binaire[1], &message_thread, sizeof(message_thread_t)) == 0, "write_binaire");
                 opcode_prec = BINAIRE;
                 break;
             case FERMETURE:
-                stop_si(write(pipe_actifs.recv_fermeture[1], &message_thread, sizeof(message_thread_t)) == 0, "write_fermeture");
+                retourne_et_fin_session_si(write(pipe_actifs.recv_fermeture[1], &message_thread, sizeof(message_thread_t)) == 0, "write_fermeture");
                 break;
             case PING:
-                stop_si(write(pipe_actifs.recv_ping[1], &message_thread, sizeof(message_thread_t)) == 0, "write_ping");
+                retourne_et_fin_session_si(write(pipe_actifs.recv_ping[1], &message_thread, sizeof(message_thread_t)) == 0, "write_ping");
                 break;
             case PONG:
-                stop_si(write(pipe_actifs.recv_pong[1], &message_thread, sizeof(message_thread_t)) == 0, "write_ping");
+                retourne_et_fin_session_si(write(pipe_actifs.recv_pong[1], &message_thread, sizeof(message_thread_t)) == 0, "write_ping");
                 break;
             default:
-                fin_session = true;
-                return;
+                retourne_et_fin_session_si(true, "opcode invalide");
         }
     }
 }
@@ -164,7 +172,7 @@ void read_fermeture_thread() {
     while (! fin_session) {
         if (poll(pollfd_recv_fermeture, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_fermeture[0], &message_thread, sizeof(message_thread_t));
-        fin_session = true;
+        retourne_et_fin_session_si(true, "message fermeture");
     }
 }
 
@@ -174,10 +182,7 @@ void read_ping_thread() {
     while (! fin_session) {
         if (poll(pollfd_recv_texte, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_texte[0], &message_thread, sizeof(message_thread_t));
-        if (message_thread.longueur > 125) {
-            fin_session = true;
-            return;
-        }
+        retourne_et_fin_session_si(message_thread.longueur > 125, "longeur ping > 125");
         envoyer_message(message_thread.message,message_thread.longueur,PONG);
     }
 }
@@ -188,14 +193,9 @@ void read_pong_thread() {
 
     while (! fin_session) {
         if (poll(pollfd_recv_pong, 1, 2000) <= 0) continue;
-        if (read(pipe_actifs.recv_pong[0], &message_thread, sizeof(message_thread_t)) <= 0 ||
-            message_thread.fin != 0 ||
-            message_thread.longueur != 0) {
-            /* RFC dit qu'on doit renvoyer exactement la même charge, je n'envoie que des rep_ping de */
-            /* Charge utile nulle donc on ne devrait avoir que des charges utiles nulles. */
-            fin_session = true;
-            return;
-        }
+        retourne_et_fin_session_si(read(pipe_actifs.recv_pong[0], &message_thread, sizeof(message_thread_t)) <= 0 ||
+                                   message_thread.fin != 1 ||
+                                   message_thread.longueur != 0, "pong invalide");
         pong_ok = true;
     }
 }
@@ -203,10 +203,7 @@ void read_pong_thread() {
 void send_ping_thread() {
     sleep(2);
     while (! fin_session) {
-        if (! pong_ok) {
-            fin_session = true;
-            return;
-        }
+        retourne_et_fin_session_si(! pong_ok, "pong timeout");
         envoyer_message("",0,PING);
         pong_ok = false;
         sleep(30);
@@ -241,6 +238,7 @@ int main(__attribute__((unused)) int argc, char * argv[]) {
     pthread_join(pthreads_actifs.read_fermeture, NULL);
     pthread_join(pthreads_actifs.read_ping, NULL);
     pthread_join(pthreads_actifs.read_pong, NULL);
+    pthread_join(pthreads_actifs.send_ping, NULL);
     close(pipe_actifs.recv_texte[0]);
     close(pipe_actifs.recv_binaire[0]);
     close(pipe_actifs.recv_fermeture[0]);
