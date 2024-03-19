@@ -10,6 +10,6 @@
 	 __typeof__ (b) _b = (b); \
 	 _a < _b ? _a : _b; })
 void stop_si(bool condition, const char* message_perror);
-void socket_timeout(int sockfd);
+void socket_timeout(int sockfd,int secondes);
 
 #endif //HTTP_COMMON_H

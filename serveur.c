@@ -90,7 +90,7 @@ void bind_port(int sockfd,uint16_t port) {
 int main() {
     sockfd_ecoute = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     stop_si(sockfd_ecoute < 0, "socket");
-    socket_timeout(sockfd_ecoute);
+    socket_timeout(sockfd_ecoute,30);
     bind_port(sockfd_ecoute, PORT);
     stop_si(listen(sockfd_ecoute, 15) < 0,"listen");
     stop_si(regcomp(&regex_decoupage_requetes, "\r?\n\r?(\n)", REG_EXTENDED),

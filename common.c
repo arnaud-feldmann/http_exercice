@@ -10,9 +10,9 @@ void stop_si(bool condition, const char* message_perror) {
     }
 }
 
-void socket_timeout(int sockfd) {
+void socket_timeout(int sockfd, int secondes) {
     struct timeval tv;
-    tv.tv_sec = 30;
+    tv.tv_sec = secondes;
     tv.tv_usec = 0;
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 }

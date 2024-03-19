@@ -7,11 +7,12 @@
     <body>
         <ul id="res">
         </ul>
-        <input type="input" id="message"></input>
+        <input type="input" id="message">
         <button id="btn_envoi" disabled="true" onclick="envoyer()">Envoyer</button>
         <br>
         <button id="btn_connexion" onclick="connexion()">Connect</button>
         <button id="btn_cloture" disabled="true" onclick="cloture()">Close</button>
+        <div id="sortie"></div>
         <script>
             function connexion(){
                 document.getElementById("btn_envoi").disabled = false;
@@ -24,9 +25,7 @@
                 };
                 ws.onmessage = function(e) {
                     console.log("Received: '" + e.data + "'");
-                    let li = document.createElement("li");
-                    li.innerText = e.data;
-                    document.getElementById("messages").appendChild(li);
+                    document.getElementById("sortie").textContent=e.data;
                 };
                 ws.onerror = function(){
                     console.log("Error => cloture");

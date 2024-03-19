@@ -55,7 +55,6 @@ void recv_thread() {
     bool mask;
     char masking_key[4];
     struct pollfd pollfd_session[1] = {sockfd_session, POLLIN, 0};
-    socket_timeout(sockfd_session);
     while (! fin_session) {
         if (poll(pollfd_session, 1, 2000) <= 0) continue;
         recevoir_exactement(header_websocket,2);
@@ -203,6 +202,7 @@ void pong_thread() {
 
 int main(__attribute__((unused)) int argc, char * argv[]) {
     sockfd_session = atoi(argv[1]);
+    socket_timeout(sockfd_session,60);
     stop_si(pipe(pipe_actifs.recv_texte), "pipe_texte");
     stop_si(pipe(pipe_actifs.recv_binaire), "pipe_binaire");
     stop_si(pipe(pipe_actifs.recv_fermeture), "pipe_fermeture");
