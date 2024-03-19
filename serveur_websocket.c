@@ -29,6 +29,9 @@ pipe_actifs_t pipe_actifs = {0,0,0,0,0,0,0,0,0,0};
 atomic_bool fin_session = ATOMIC_VAR_INIT(false);
 atomic_bool pong_ok = ATOMIC_VAR_INIT(true);
 
+pthread_cond_t condition_timer_ping = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mutex_timer_ping = PTHREAD_MUTEX_INITIALIZER;
+
 void afficher_bits(const void* adresse, size_t taille) {
     const uint8_t* octets = (const uint8_t*)adresse;
     for (size_t i = 0; i < taille; i++) {
@@ -41,17 +44,18 @@ void afficher_bits(const void* adresse, size_t taille) {
     printf("\n");
 }
 
-void recevoir_exactement(void* buf, long n) {
+int recevoir_exactement(void* buf, long n) {
     long total_octets_recus = 0;
     long octets_recus;
 
     while (total_octets_recus < n) {
         octets_recus = recv(sockfd_session, buf + total_octets_recus, n - total_octets_recus, 0);
         afficher_bits(buf + total_octets_recus,octets_recus);
-        retourne_et_fin_session_si(octets_recus <= 0, "recv");
+        if (octets_recus <= 0) return -1;
         total_octets_recus += octets_recus;
     }
 
+    return 0;
 }
 
 void recv_thread() {
@@ -74,26 +78,22 @@ void recv_thread() {
         printf("OPCODE : %d\n", opcode);
         printf("payload_length_1 : %d\n", payload_length_1);
         if (payload_length_1 == 126) {
-            recevoir_exactement(header_websocket + 2,2);
+            retourne_et_fin_session_si(recevoir_exactement(header_websocket + 2,2),"recv payload_length_2 moyen");
             message_thread.longueur = be16toh(header_websocket->header_websocket_moyen.payload_length_2);
         } else if (payload_length_1 == 127) {
-            recevoir_exactement(header_websocket + 2, 8);
+            retourne_et_fin_session_si(recevoir_exactement(header_websocket + 2, 8), "recv payload_length_2 grand");
             message_thread.longueur = be64toh(header_websocket->header_websocket_grand.payload_length_2);
         } else message_thread.longueur = payload_length_1;
-        if (mask) recevoir_exactement(&masking_key, 4);
-        if (message_thread.longueur > BUFFER_LEN) {
-            fin_session = true;
-            return;
+        if (mask) {
+            retourne_et_fin_session_si(recevoir_exactement(&masking_key, 4),"recv cle mask");
         }
-        recevoir_exactement(message_thread.message,(long)message_thread.longueur);
+        retourne_et_fin_session_si(message_thread.longueur > BUFFER_LEN,"recv message trop grand");
+        retourne_et_fin_session_si(recevoir_exactement(message_thread.message,(long)message_thread.longueur),"recv message");
         if (mask) {
             for (int i = 0 ; i < message_thread.longueur ; i++) message_thread.message[i]=(message_thread.message[i])^masking_key[i%4];
         }
         if (opcode == CONTINUATION) {
-            if (opcode_prec != TEXTE && opcode_prec != BINAIRE) {
-                fin_session = true;
-                return;
-            }
+            retourne_et_fin_session_si(opcode_prec != TEXTE && opcode_prec != BINAIRE, "CONTINUATION invalide");
             opcode = opcode_prec;
         }
         switch (opcode) {
@@ -202,12 +202,17 @@ void read_pong_thread() {
 
 void send_ping_thread() {
     sleep(2);
+    pthread_mutex_lock(&mutex_timer_ping);
     while (! fin_session) {
         retourne_et_fin_session_si(! pong_ok, "pong timeout");
         envoyer_message("",0,PING);
         pong_ok = false;
-        sleep(30);
+        struct timespec timer;
+        clock_gettime(CLOCK_REALTIME, &timer);
+        timer.tv_sec += 30;
+        pthread_cond_timedwait(&condition_timer_ping,&mutex_timer_ping,&timer);
     }
+    pthread_mutex_unlock(&mutex_timer_ping);
 }
 
 int main(__attribute__((unused)) int argc, char * argv[]) {
@@ -233,6 +238,7 @@ int main(__attribute__((unused)) int argc, char * argv[]) {
     stop_si(pthread_create(&(pthreads_actifs.send_ping), NULL, (void *(*)(void *)) &send_ping_thread, NULL),
             "pong_pthread_create");
     pthread_join(pthreads_actifs.recv,NULL);
+    pthread_cond_signal(&condition_timer_ping);
     pthread_join(pthreads_actifs.read_texte, NULL);
     pthread_join(pthreads_actifs.read_binaire, NULL);
     pthread_join(pthreads_actifs.read_fermeture, NULL);
@@ -250,6 +256,7 @@ int main(__attribute__((unused)) int argc, char * argv[]) {
     close(pipe_actifs.recv_ping[1]);
     close(pipe_actifs.recv_pong[1]);
     close(sockfd_session);
+    printf("session websocket terminée");
 }
 
 #pragma clang diagnostic pop
