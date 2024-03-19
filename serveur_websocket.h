@@ -8,11 +8,12 @@
 
 struct pthreads_actifs {
     pthread_t recv;
-    pthread_t recv_texte;
-    pthread_t recv_binaire;
-    pthread_t recv_fermeture;
-    pthread_t recv_ping;
-    pthread_t recv_pong;
+    pthread_t read_texte;
+    pthread_t read_binaire;
+    pthread_t read_fermeture;
+    pthread_t read_ping;
+    pthread_t read_pong;
+    pthread_t send_ping;
 };
 typedef struct pthreads_actifs pthreads_actifs_t;
 

@@ -2,7 +2,6 @@
 #include <sys/socket.h>
 #include <stdatomic.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <poll.h>
 #include <string.h>
 #include <endian.h>
@@ -19,6 +18,7 @@ pthreads_actifs_t pthreads_actifs = {0,0,0,0,0,0};
 pipe_actifs_t pipe_actifs = {0,0,0,0,0,0,0,0,0,0};
 
 atomic_bool fin_session = ATOMIC_VAR_INIT(false);
+atomic_bool pong_ok = ATOMIC_VAR_INIT(true);
 
 void afficher_bits(const void* adresse, size_t taille) {
     const uint8_t* octets = (const uint8_t*)adresse;
@@ -138,7 +138,7 @@ void envoyer_message(void* message, uint_fast64_t longueur,opcode_t opcode) {
     send(sockfd_session, rep, longueur_complete, 0);
 }
 
-void texte_thread() {
+void read_texte_thread() {
     message_thread_t message_thread;
     struct pollfd pollfd_recv_texte[1] = {pipe_actifs.recv_texte[0], POLLIN, 0};
     while (! fin_session) {
@@ -149,7 +149,7 @@ void texte_thread() {
     }
 }
 
-void binaire_thread() {
+void read_binaire_thread() {
     message_thread_t message_thread;
     struct pollfd pollfd_recv_binaire[1] = {pipe_actifs.recv_binaire[0], POLLIN, 0};
     while (! fin_session) {
@@ -158,7 +158,7 @@ void binaire_thread() {
     }
 }
 
-void fermeture_thread() {
+void read_fermeture_thread() {
     message_thread_t message_thread;
     struct pollfd pollfd_recv_fermeture[1] = {pipe_actifs.recv_fermeture[0], POLLIN, 0};
     while (! fin_session) {
@@ -168,9 +168,9 @@ void fermeture_thread() {
     }
 }
 
-void ping_thread() {
+void read_ping_thread() {
     message_thread_t message_thread;
-    struct pollfd pollfd_recv_texte[1] = {pipe_actifs.recv_texte[0], POLLIN, 0};
+    struct pollfd pollfd_recv_texte[1] = {pipe_actifs.recv_ping[0], POLLIN, 0};
     while (! fin_session) {
         if (poll(pollfd_recv_texte, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_texte[0], &message_thread, sizeof(message_thread_t));
@@ -182,25 +182,34 @@ void ping_thread() {
     }
 }
 
-void pong_thread() {
-    fcntl(pipe_actifs.recv_pong[0], F_SETFL, O_NONBLOCK);
-
+void read_pong_thread() {
     struct pollfd pollfd_recv_pong[1] = {pipe_actifs.recv_pong[0], POLLIN, 0};
     message_thread_t message_thread;
 
-    for(sleep(2); ! fin_session; sleep(15)) {
-        envoyer_message("",0,PING);
-        if ((poll(pollfd_recv_pong, 1, 2000) <= 0) ||
-            (read(pipe_actifs.recv_pong[0], &message_thread, sizeof(message_thread_t)) <= 0) ||
+    while (! fin_session) {
+        if (poll(pollfd_recv_pong, 1, 2000) <= 0) continue;
+        if (read(pipe_actifs.recv_pong[0], &message_thread, sizeof(message_thread_t)) <= 0 ||
             message_thread.fin != 0 ||
-            message_thread.longueur != 0 ||
-            (poll(pollfd_recv_pong, 1, 0) != 0)) {
+            message_thread.longueur != 0) {
             /* RFC dit qu'on doit renvoyer exactement la même charge, je n'envoie que des rep_ping de */
-            /* Charge utile nulle donc on ne devrait avoir que des charges utiles nulles. Le dernier poll sert à
-             * vérifier que le buffer est vide après retrait et ne pas permettre ceux qui spamment de "pong" */
+            /* Charge utile nulle donc on ne devrait avoir que des charges utiles nulles. */
             fin_session = true;
             return;
         }
+        pong_ok = true;
+    }
+}
+
+void send_ping_thread() {
+    sleep(2);
+    while (! fin_session) {
+        if (! pong_ok) {
+            fin_session = true;
+            return;
+        }
+        envoyer_message("",0,PING);
+        pong_ok = false;
+        sleep(30);
     }
 }
 
@@ -214,22 +223,24 @@ int main(__attribute__((unused)) int argc, char * argv[]) {
     stop_si(pipe(pipe_actifs.recv_pong), "pipe_pong");
     stop_si(pthread_create(&(pthreads_actifs.recv), NULL, (void *(*)(void *)) &recv_thread, NULL),
             "recv_pthread_create");
-    stop_si(pthread_create(&(pthreads_actifs.recv_texte), NULL, (void *(*)(void *)) &texte_thread, NULL),
+    stop_si(pthread_create(&(pthreads_actifs.read_texte), NULL, (void *(*)(void *)) &read_texte_thread, NULL),
             "texte_pthread_create");
-    stop_si(pthread_create(&(pthreads_actifs.recv_binaire), NULL, (void *(*)(void *)) &binaire_thread, NULL),
+    stop_si(pthread_create(&(pthreads_actifs.read_binaire), NULL, (void *(*)(void *)) &read_binaire_thread, NULL),
             "binaire_pthread_create");
-    stop_si(pthread_create(&(pthreads_actifs.recv_fermeture), NULL, (void *(*)(void *)) &fermeture_thread, NULL),
+    stop_si(pthread_create(&(pthreads_actifs.read_fermeture), NULL, (void *(*)(void *)) &read_fermeture_thread, NULL),
             "fermeture_pthread_create");
-    stop_si(pthread_create(&(pthreads_actifs.recv_ping), NULL, (void *(*)(void *)) &ping_thread, NULL),
+    stop_si(pthread_create(&(pthreads_actifs.read_ping), NULL, (void *(*)(void *)) &read_ping_thread, NULL),
             "ping_pthread_create");
-    stop_si(pthread_create(&(pthreads_actifs.recv_pong), NULL, (void *(*)(void *)) &pong_thread, NULL),
+    stop_si(pthread_create(&(pthreads_actifs.read_pong), NULL, (void *(*)(void *)) &read_pong_thread, NULL),
+            "pong_pthread_create");
+    stop_si(pthread_create(&(pthreads_actifs.send_ping), NULL, (void *(*)(void *)) &send_ping_thread, NULL),
             "pong_pthread_create");
     pthread_join(pthreads_actifs.recv,NULL);
-    pthread_join(pthreads_actifs.recv_texte, NULL);
-    pthread_join(pthreads_actifs.recv_binaire, NULL);
-    pthread_join(pthreads_actifs.recv_fermeture, NULL);
-    pthread_join(pthreads_actifs.recv_ping, NULL);
-    pthread_join(pthreads_actifs.recv_pong, NULL);
+    pthread_join(pthreads_actifs.read_texte, NULL);
+    pthread_join(pthreads_actifs.read_binaire, NULL);
+    pthread_join(pthreads_actifs.read_fermeture, NULL);
+    pthread_join(pthreads_actifs.read_ping, NULL);
+    pthread_join(pthreads_actifs.read_pong, NULL);
     close(pipe_actifs.recv_texte[0]);
     close(pipe_actifs.recv_binaire[0]);
     close(pipe_actifs.recv_fermeture[0]);
