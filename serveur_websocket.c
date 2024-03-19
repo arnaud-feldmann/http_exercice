@@ -143,7 +143,7 @@ void texte_thread() {
     message_thread_t message_thread;
     struct pollfd pollfd_recv_texte[1] = {pipe_actifs.recv_texte[0], POLLIN, 0};
     while (! fin_session) {
-        if (poll(pollfd_recv_texte, 1, 2000)) continue;
+        if (poll(pollfd_recv_texte, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_texte[0], &message_thread, sizeof(message_thread_t));
         fwrite(message_thread.message, sizeof(char), message_thread.longueur, stdout);
         envoyer_message(message_thread.message,min(1,message_thread.longueur),TEXTE);
@@ -154,7 +154,7 @@ void binaire_thread() {
     message_thread_t message_thread;
     struct pollfd pollfd_recv_binaire[1] = {pipe_actifs.recv_binaire[0], POLLIN, 0};
     while (! fin_session) {
-        if (poll(pollfd_recv_binaire, 1, 2000)) continue;
+        if (poll(pollfd_recv_binaire, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_binaire[0], &message_thread, sizeof(message_thread_t));
     }
 }
@@ -163,7 +163,7 @@ void fermeture_thread() {
     message_thread_t message_thread;
     struct pollfd pollfd_recv_fermeture[1] = {pipe_actifs.recv_fermeture[0], POLLIN, 0};
     while (! fin_session) {
-        if (poll(pollfd_recv_fermeture, 1, 2000)) continue;
+        if (poll(pollfd_recv_fermeture, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_fermeture[0], &message_thread, sizeof(message_thread_t));
         fin_session = true;
     }
@@ -173,7 +173,7 @@ void ping_thread() {
     message_thread_t message_thread;
     struct pollfd pollfd_recv_texte[1] = {pipe_actifs.recv_texte[0], POLLIN, 0};
     while (! fin_session) {
-        if (poll(pollfd_recv_texte, 1, 2000)) continue;
+        if (poll(pollfd_recv_texte, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_texte[0], &message_thread, sizeof(message_thread_t));
         envoyer_message(message_thread.message,message_thread.longueur,PONG);
     }
