@@ -8,8 +8,8 @@ image:
   repository: ghcr.io/arnaud-feldmann/http_exercice 
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "202403101723" 
-  digest: "sha256:3fe67296d282135262cc9999cb6940ef84ad2e0d381b1935d334a5b6f6d1891a"
+  tag: "202403202145"  
+  digest: "sha256:7a92f0031a6c074e01fc07f06640a0ad4314b06d91240f8ee899a4db047368e5"
 
 imagePullSecrets: []
 nameOverride: ""
