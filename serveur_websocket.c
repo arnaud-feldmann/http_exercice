@@ -70,7 +70,7 @@ void recv_thread() {
     struct pollfd pollfd_session[1] = {sockfd_session, POLLIN, 0};
     while (! fin_session) {
         if (poll(pollfd_session, 1, 2000) <= 0) continue;
-        recevoir_exactement(header_websocket,2);
+        retourne_et_fin_session_si(recevoir_exactement(header_websocket,2), "recv payload_length_1");
         message_thread.fin = header_websocket->header_websocket_petit.fin_rsv_opcode >> 7;
         opcode = header_websocket->header_websocket_petit.fin_rsv_opcode & OPCODE;
         mask = header_websocket->header_websocket_petit.mask_payload_length_1 >> 7;
@@ -172,6 +172,7 @@ void read_fermeture_thread() {
     while (! fin_session) {
         if (poll(pollfd_recv_fermeture, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_fermeture[0], &message_thread, sizeof(message_thread_t));
+        envoyer_message(message_thread.message,message_thread.longueur,FERMETURE);
         retourne_et_fin_session_si(true, "message fermeture");
     }
 }
