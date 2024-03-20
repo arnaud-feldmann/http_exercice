@@ -22,7 +22,7 @@ stop:
 test: run
 	sleep 1
 	./test/test_http.sh
-	./test/test_websocket_handshake.sh
+	./test/test_websocket.sh
 	@$(call stop)
 
 clean: stop
