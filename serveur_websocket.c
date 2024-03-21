@@ -59,8 +59,7 @@ int recevoir_exactement(void* buf, long n) {
 }
 
 void recv_thread() {
-    header_websocket_grand_t header_websocket_grand;
-    header_websocket_t* header_websocket = (header_websocket_t*)&header_websocket_grand;
+    header_websocket_t header_websocket;
     message_thread_t message_thread;
     uint_fast8_t opcode;
     uint_fast8_t opcode_prec = -1;
@@ -70,19 +69,21 @@ void recv_thread() {
     struct pollfd pollfd_session[1] = {sockfd_session, POLLIN, 0};
     while (! fin_session) {
         if (poll(pollfd_session, 1, 2000) <= 0) continue;
-        retourne_et_fin_session_si(recevoir_exactement(header_websocket,2), "recv payload_length_1");
-        message_thread.fin = header_websocket->header_websocket_petit.fin_rsv_opcode >> 7;
-        opcode = header_websocket->header_websocket_petit.fin_rsv_opcode & OPCODE;
-        mask = header_websocket->header_websocket_petit.mask_payload_length_1 >> 7;
-        payload_length_1 = header_websocket->header_websocket_petit.mask_payload_length_1 & PAYLOAD_LENGTH_1;
+        retourne_et_fin_session_si(recevoir_exactement(&header_websocket,2), "recv payload_length_1");
+        message_thread.fin = header_websocket.fin_rsv_opcode >> 7;
+        opcode = header_websocket.fin_rsv_opcode & OPCODE;
+        mask = header_websocket.mask_payload_length_1 >> 7;
+        payload_length_1 = header_websocket.mask_payload_length_1 & PAYLOAD_LENGTH_1;
         printf("OPCODE : %d\n", opcode);
         printf("payload_length_1 : %d\n", payload_length_1);
         if (payload_length_1 == 126) {
-            retourne_et_fin_session_si(recevoir_exactement(header_websocket + 2,2),"recv payload_length_2 moyen");
-            message_thread.longueur = be16toh(header_websocket->header_websocket_moyen.payload_length_2);
+            uint64_t payload_length_2;
+            retourne_et_fin_session_si(recevoir_exactement(&payload_length_2,2),"recv payload_length_2 moyen");
+            message_thread.longueur = be16toh(payload_length_2);
         } else if (payload_length_1 == 127) {
-            retourne_et_fin_session_si(recevoir_exactement(header_websocket + 2, 8), "recv payload_length_2 grand");
-            message_thread.longueur = be64toh(header_websocket->header_websocket_grand.payload_length_2);
+            uint64_t payload_length_2;
+            retourne_et_fin_session_si(recevoir_exactement(&payload_length_2, 8), "recv payload_length_2 grand");
+            message_thread.longueur = be64toh(payload_length_2);
         } else message_thread.longueur = payload_length_1;
         if (mask) {
             retourne_et_fin_session_si(recevoir_exactement(&masking_key, 4),"recv cle mask");
@@ -124,24 +125,24 @@ void envoyer_message(void* message, uint_fast64_t longueur,opcode_t opcode) {
     uint_fast64_t longueur_complete;
     char rep[BUFFER_LEN];
     header_websocket_t* rep_header = (header_websocket_t*)rep;
-    rep_header->header_websocket_petit.fin_rsv_opcode = FIN|opcode;
+    rep_header->fin_rsv_opcode = FIN | opcode;
     if (longueur < 126) {
-        longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_petit_t));
-        rep_header->header_websocket_petit.mask_payload_length_1 = longueur;
-        memcpy(rep + sizeof(header_websocket_petit_t), message, longueur);
-        longueur_complete = longueur + sizeof(header_websocket_petit_t);
+        longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_t));
+        rep_header->mask_payload_length_1 = longueur;
+        memcpy(rep + sizeof(header_websocket_t), message, longueur);
+        longueur_complete = longueur + sizeof(header_websocket_t);
     } else if (longueur < 65536) {
-        longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_moyen_t));
-        rep_header->header_websocket_moyen.mask_payload_length_1 = 126;
-        rep_header->header_websocket_moyen.payload_length_2 = htobe16(longueur);
-        memcpy(rep + sizeof(header_websocket_moyen_t), message, longueur);
-        longueur_complete = longueur + sizeof(header_websocket_moyen_t);
+        longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_t) - 2);
+        rep_header->mask_payload_length_1 = 126;
+        *(rep+ sizeof(header_websocket_t)) = htobe16(longueur);
+        memcpy(rep + sizeof(header_websocket_t) + 2, message, longueur);
+        longueur_complete = longueur + sizeof(header_websocket_t) + 2;
     } else {
-        longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_grand_t));
-        rep_header->header_websocket_grand.mask_payload_length_1 = 127;
-        rep_header->header_websocket_grand.payload_length_2 = htobe64(longueur);
-        memcpy(rep + sizeof(header_websocket_grand_t), message, longueur);
-        longueur_complete = longueur + sizeof(header_websocket_grand_t);
+        longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_t) - 8);
+        rep_header->mask_payload_length_1 = 127;
+        *(rep+ sizeof(header_websocket_t)) = htobe64(longueur);
+        memcpy(rep + sizeof(header_websocket_t) + 8, message, longueur);
+        longueur_complete = longueur + sizeof(header_websocket_t) + 8;
     }
     send(sockfd_session, rep, longueur_complete, 0);
 }

@@ -39,31 +39,11 @@ typedef uint8_t opcode_t;
 #define OPCODE 0b00001111
 #define PAYLOAD_LENGTH_1 0b01111111
 
-struct header_websocket_petit {
+struct header_websocket {
     uint8_t fin_rsv_opcode;
     uint8_t mask_payload_length_1;
 };
-typedef struct header_websocket_petit header_websocket_petit_t;
-
-struct header_websocket_moyen {
-    uint8_t fin_rsv_opcode;
-    uint8_t mask_payload_length_1;
-    uint16_t payload_length_2;
-};
-typedef struct header_websocket_moyen header_websocket_moyen_t;
-
-struct header_websocket_grand {
-    uint8_t fin_rsv_opcode;
-    uint8_t mask_payload_length_1;
-    uint64_t payload_length_2;
-};
-typedef struct header_websocket_grand header_websocket_grand_t;
-
-typedef union {
-    header_websocket_petit_t header_websocket_petit;
-    header_websocket_moyen_t header_websocket_moyen;
-    header_websocket_grand_t header_websocket_grand;
-} header_websocket_t;
+typedef struct header_websocket header_websocket_t;
 
 struct message_thread {
     bool fin;
