@@ -140,7 +140,7 @@ void envoyer_message(void* message, uint64_t longueur,opcode_t opcode) {
     } else {
         longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_t) - 8);
         rep_header->mask_payload_length_1 = 127;
-        *((uint64_t*)(rep + sizeof(header_websocket_t))) = htobe16((uint64_t)longueur);
+        *((uint64_t*)(rep + sizeof(header_websocket_t))) = htobe64((uint64_t)longueur);
         memcpy(rep + sizeof(header_websocket_t) + 8, message, longueur);
         longueur_complete = longueur + sizeof(header_websocket_t) + 8;
     }
