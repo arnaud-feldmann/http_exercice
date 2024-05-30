@@ -121,8 +121,8 @@ void recv_thread() {
     }
 }
 
-void envoyer_message(void* message, uint_fast64_t longueur,opcode_t opcode) {
-    uint_fast64_t longueur_complete;
+void envoyer_message(void* message, uint64_t longueur,opcode_t opcode) {
+    uint64_t longueur_complete;
     char rep[BUFFER_LEN];
     header_websocket_t* rep_header = (header_websocket_t*)rep;
     rep_header->fin_rsv_opcode = FIN | opcode;
@@ -134,13 +134,13 @@ void envoyer_message(void* message, uint_fast64_t longueur,opcode_t opcode) {
     } else if (longueur < 65536) {
         longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_t) - 2);
         rep_header->mask_payload_length_1 = 126;
-        *(rep+ sizeof(header_websocket_t)) = htobe16(longueur);
+        *((uint16_t*)(rep + sizeof(header_websocket_t))) = htobe16((uint16_t)longueur);
         memcpy(rep + sizeof(header_websocket_t) + 2, message, longueur);
         longueur_complete = longueur + sizeof(header_websocket_t) + 2;
     } else {
         longueur = min(longueur,BUFFER_LEN - sizeof(header_websocket_t) - 8);
         rep_header->mask_payload_length_1 = 127;
-        *(rep+ sizeof(header_websocket_t)) = htobe64(longueur);
+        *((uint64_t*)(rep + sizeof(header_websocket_t))) = htobe16((uint64_t)longueur);
         memcpy(rep + sizeof(header_websocket_t) + 8, message, longueur);
         longueur_complete = longueur + sizeof(header_websocket_t) + 8;
     }
@@ -154,6 +154,7 @@ void read_texte_thread() {
         if (poll(pollfd_recv_texte, 1, 2000) <= 0) continue;
         read(pipe_actifs.recv_texte[0], &message_thread, sizeof(message_thread_t));
         fwrite(message_thread.message, sizeof(char), message_thread.longueur, stdout);
+        printf("\n");
         envoyer_message(message_thread.message,message_thread.longueur,TEXTE);
     }
 }
