@@ -77,7 +77,7 @@ void recv_thread() {
         printf("OPCODE : %d\n", opcode);
         printf("payload_length_1 : %d\n", payload_length_1);
         if (payload_length_1 == 126) {
-            uint64_t payload_length_2;
+            uint16_t payload_length_2;
             retourne_et_fin_session_si(recevoir_exactement(&payload_length_2,2),"recv payload_length_2 moyen");
             message_thread.longueur = be16toh(payload_length_2);
         } else if (payload_length_1 == 127) {
